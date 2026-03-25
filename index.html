@@ -544,8 +544,7 @@ async function impSheets(){
 function exportCSV(){
   const rows=[["ID","Nom","Projet","Client","Priorite","Estimation","TempsTotal","Statut","Notes"]];
   S.tasks.forEach(t=>{const p=S.projects.find(x=>x.id===t.project);rows.push([t.id,`"${t.name}"`,p?`"${p.name}"`:"",p?p.client||"":"",t.priority,t.estimate||0,fmt(t.elapsed||0),t.done?"Terminée":"En cours",`"${t.notes||""}"`]);});
-  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["﻿"+rows.map(r=>r.join(",")).join("
-")],{type:"text/csv;charset=utf-8;"}));a.download="guichhome_"+new Date().toISOString().slice(0,10)+".csv";a.click();toast("✓ CSV exporté","s");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["﻿"+rows.map(r=>r.join(",")).join("\\n")],{type:"text/csv;charset=utf-8;"}));a.download="guichhome_"+new Date().toISOString().slice(0,10)+".csv";a.click();toast("✓ CSV exporté","s");
 }
 function toast(msg,type){const e=document.getElementById("toast");e.textContent=msg;e.className="toast "+type+" show";clearTimeout(window._tt);window._tt=setTimeout(()=>e.classList.remove("show"),3000);}
 document.querySelectorAll(".mo").forEach(o=>o.addEventListener("click",e=>{if(e.target===o)o.classList.remove("open");}));
