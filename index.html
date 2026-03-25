@@ -205,9 +205,8 @@ main::-webkit-scrollbar{width:5px;}main::-webkit-scrollbar-thumb{background:var(
   <div class="sbdiv"></div>
   <div class="sbs"><div class="sbl">Google Sheets</div></div>
   <div class="smini">
-    <input type="text" id="sid" placeholder="ID du Google Sheet" />
-    <input type="password" id="skey" placeholder="Clé API Google" />
-    <button class="btn sm" style="width:100%;justify-content:center;margin-top:2px;" onclick="testSheets()">Tester connexion</button>
+    <input type="text" id="surl" placeholder="URL du script Apps Script" style="font-size:9px;" />
+    <button class="btn sm" style="width:100%;justify-content:center;margin-top:4px;" onclick="testSheets()">Tester connexion</button>
   </div>
 </aside>
 <main>
@@ -293,20 +292,19 @@ main::-webkit-scrollbar{width:5px;}main::-webkit-scrollbar-thumb{background:var(
 <div class="toast" id="toast"></div>
 
 <script>
-let S={projects:[],tasks:[],cur:"projects",cpid:null,df:"all",gf:"all",ao:false,tsec:0,sid:"",skey:"",theme:"dark"};
+let S={projects:[],tasks:[],cur:"projects",cpid:null,df:"all",gf:"all",ao:false,tsec:0,surl:"",theme:"dark"};
 const IC=["🪚","🔨","🪵","🔩","📐","🏠","🔧","🪛","🪟","🚪"];
 function ic(i){return IC[i%IC.length];}
 function load(){
   try{
     const d=JSON.parse(localStorage.getItem("gh3")||"{}");
-    Object.assign(S,{projects:d.projects||[],tasks:d.tasks||[],tsec:d.tsec||0,sid:d.sid||"",skey:d.skey||"",theme:d.theme||"dark"});
+    Object.assign(S,{projects:d.projects||[],tasks:d.tasks||[],tsec:d.tsec||0,surl:d.surl||"",theme:d.theme||"dark"});
     S.tasks.forEach(t=>t.timerRunning=false);
-    if(S.sid)document.getElementById("sid").value=S.sid;
-    if(S.skey)document.getElementById("skey").value=S.skey;
+    if(S.surl)document.getElementById("surl").value=S.surl;
   }catch(e){}
   if(!S.projects.length)demo();
 }
-function save(){localStorage.setItem("gh3",JSON.stringify({projects:S.projects,tasks:S.tasks,tsec:S.tsec,sid:S.sid,skey:S.skey,theme:S.theme}));}
+function save(){localStorage.setItem("gh3",JSON.stringify({projects:S.projects,tasks:S.tasks,tsec:S.tsec,surl:S.surl,theme:S.theme}));}
 function demo(){
   S.projects=[{id:"p1",name:"Rénovation Cuisine Dupont",client:"M. Dupont"},{id:"p2",name:"Pose Parquet Leblanc",client:"Mme Leblanc"},{id:"p3",name:"Escalier Moreau",client:"Famille Moreau"}];
   S.tasks=[
@@ -507,40 +505,75 @@ function saveTask(){
   save();renderAll();closeMo("moTask");toast("✓ Tâche créée","s");
 }
 function toggleTheme(){S.theme=S.theme==="dark"?"light":"dark";document.documentElement.setAttribute("data-theme",S.theme);document.getElementById("themeBtn").textContent=S.theme==="dark"?"🌙":"☀️";document.querySelector("meta[name=theme-color]").setAttribute("content",S.theme==="dark"?"#0C0A08":"#F2EDE4");save();}
+
 function testSheets(){
-  S.sid=document.getElementById("sid").value.trim();S.skey=document.getElementById("skey").value.trim();
-  if(!S.sid||!S.skey){toast("Renseignez l'ID et la clé","e");return;}
+  const url = document.getElementById("surl").value.trim();
+  if(!url){toast("Collez l'URL du script Apps Script","e");return;}
+  S.surl = url; save();
   toast("Test en cours...","i");
-  fetch(`https://sheets.googleapis.com/v4/spreadsheets/${S.sid}?key=${S.skey}`).then(r=>{
-    if(r.ok){document.getElementById("sdot").className="sdot ok";document.getElementById("stxt").textContent="Connecté";save();toast("✓ Sheets connecté !","s");}
-    else{document.getElementById("sdot").className="sdot err";toast("Connexion échouée","e");}
-  }).catch(()=>{document.getElementById("sdot").className="sdot err";toast("Erreur réseau","e");});
+  fetch(url + "?action=load")
+    .then(r=>r.json())
+    .then(d=>{
+      if(d.success!==false){
+        document.getElementById("sdot").className="sdot ok";
+        document.getElementById("stxt").textContent="Connecté";
+        toast("✓ Sheets connecté !","s");
+      } else {
+        document.getElementById("sdot").className="sdot err";
+        toast("Erreur: "+d.error,"e");
+      }
+    }).catch(err=>{
+      document.getElementById("sdot").className="sdot err";
+      toast("Erreur réseau — vérifiez l'URL et les droits","e");
+    });
 }
 async function doSync(){
-  S.sid=document.getElementById("sid").value.trim();S.skey=document.getElementById("skey").value.trim();
-  if(!S.sid||!S.skey){toast("Configurez Sheets d'abord","e");return;}
-  const d=document.getElementById("sync-dir").value;
-  if(d==="export"||d==="both")await expSheets();
-  if(d==="import"||d==="both")await impSheets();
+  const url = document.getElementById("surl").value.trim();
+  if(!url){toast("Configurez l'URL Apps Script d'abord","e");return;}
+  S.surl = url; save();
+  const dir=document.getElementById("sync-dir").value;
+  if(dir==="export"||dir==="both") await expSheets(url);
+  if(dir==="import"||dir==="both") await impSheets(url);
   closeMo("moSheets");
 }
-async function expSheets(){
-  const h=[["ID","Nom","Projet","Client","Priorite","Estimation(min)","TempsTotal(sec)","Statut","Archivee","Notes"]];
-  const rows=S.tasks.map(t=>{const p=S.projects.find(x=>x.id===t.project);return[t.id,t.name,p?p.name:"",p?p.client||"":"",t.priority,t.estimate||0,t.elapsed||0,t.done?"Terminee":"En cours",t.archived?"Oui":"Non",t.notes||""];});
-  try{const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${S.sid}/values/Taches!A1?valueInputOption=RAW&key=${S.skey}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({range:"Taches!A1",majorDimension:"ROWS",values:[...h,...rows]})});r.ok?toast("✓ Export réussi","s"):toast("Erreur export (OAuth nécessaire pour écriture)","e");}catch(e){toast("Erreur réseau","e");}
-}
-async function impSheets(){
+async function expSheets(url){
+  toast("Export en cours...","i");
   try{
-    const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${S.sid}/values/Taches!A2:J?key=${S.skey}`);
-    const d=await r.json();if(!d.values){toast("Aucune donnée","i");return;}
-    let n=0;d.values.forEach(row=>{
-      if(!row[0]||S.tasks.find(t=>t.id===row[0]))return;
-      let pid="";if(row[2]){let p=S.projects.find(x=>x.name===row[2]);if(!p){p={id:"p"+Date.now()+Math.random().toString(36).slice(2),name:row[2],client:row[3]||""};S.projects.push(p);}pid=p.id;}
-      S.tasks.push({id:row[0],name:row[1]||"",project:pid,priority:row[4]||"normal",estimate:parseInt(row[5])||0,elapsed:parseInt(row[6])||0,done:row[7]==="Terminee",archived:row[8]==="Oui",notes:row[9]||"",timerRunning:false,createdAt:Date.now()});n++;
+    const r = await fetch(url, {
+      method:"POST",
+      headers:{"Content-Type":"text/plain"},
+      body: JSON.stringify({
+        action:"sync",
+        projects: S.projects,
+        tasks: S.tasks
+      })
     });
-    save();renderAll();toast("✓ "+n+" tâche(s) importée(s)","s");
-  }catch(e){toast("Erreur import","e");}
+    const d = await r.json();
+    if(d.success){
+      toast("✓ "+d.stats.tasks+" tâches exportées vers Sheets !","s");
+    } else {
+      toast("Erreur export: "+(d.error||"inconnue"),"e");
+    }
+  }catch(e){toast("Erreur réseau lors de l'export","e");}
 }
+async function impSheets(url){
+  toast("Import en cours...","i");
+  try{
+    const r = await fetch(url+"?action=load");
+    const d = await r.json();
+    if(!d.success){toast("Erreur import: "+(d.error||"inconnue"),"e");return;}
+    let np=0, nt=0;
+    (d.projects||[]).forEach(p=>{
+      if(!S.projects.find(x=>x.id===p.id)){S.projects.push(p);np++;}
+    });
+    (d.tasks||[]).forEach(t=>{
+      if(!S.tasks.find(x=>x.id===t.id)){S.tasks.push(t);nt++;}
+    });
+    save();renderAll();
+    toast("✓ "+np+" projets et "+nt+" tâches importés","s");
+  }catch(e){toast("Erreur réseau lors de l'import","e");}
+}
+
 function exportCSV(){
   const rows=[["ID","Nom","Projet","Client","Priorite","Estimation","TempsTotal","Statut","Notes"]];
   S.tasks.forEach(t=>{const p=S.projects.find(x=>x.id===t.project);rows.push([t.id,`"${t.name}"`,p?`"${p.name}"`:"",p?p.client||"":"",t.priority,t.estimate||0,fmt(t.elapsed||0),t.done?"Terminée":"En cours",`"${t.notes||""}"`]);});
@@ -553,7 +586,7 @@ if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch((
 load();
 document.documentElement.setAttribute("data-theme",S.theme);
 document.getElementById("themeBtn").textContent=S.theme==="dark"?"🌙":"☀️";
-if(S.sid&&S.skey){document.getElementById("sdot").className="sdot ok";document.getElementById("stxt").textContent="Connecté";}
+if(S.surl){document.getElementById("sdot").className="sdot ok";document.getElementById("stxt").textContent="Connecté";}
 renderAll();
 </script>
 </body>
