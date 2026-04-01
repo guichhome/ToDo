@@ -960,13 +960,27 @@ function checkPin(){
     setTimeout(()=>err.textContent='',2000);
   }
 }
-function logout(){
+async function logout(){
+  // ── Sync automatique avant déconnexion ──
+  if(S.surl){
+    const userName = CU ? CU.name.split(' ')[0] : '?';
+    toast('💾 Synchronisation avant déconnexion...','i');
+    try{
+      await expSheets(S.surl);
+      toast('✓ Sync OK — Déconnexion de '+userName,'s');
+    }catch(e){
+      console.warn('Auto-sync échouée:',e);
+      toast('⚠ Sync échouée, déconnexion quand même','w');
+    }
+    // Petit délai pour que le toast soit visible
+    await new Promise(r=>setTimeout(r,1200));
+  }
   CU=null;pinBuffer='';selectedLoginUser=null;
   document.getElementById('pinSection').style.display='none';
   document.getElementById('loginSub').textContent='Sélectionnez votre profil';
   document.getElementById('app').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
-  renderLogin(); // re-render with latest user data
+  renderLogin();
 }
 function initApp(){
   document.getElementById('headerAvatar').textContent=CU.initials;
