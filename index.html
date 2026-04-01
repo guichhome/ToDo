@@ -990,7 +990,7 @@ async function logout(){
     await new Promise(r=>setTimeout(r,1200));
   }
   CU=null;pinBuffer='';selectedLoginUser=null;
-  sessionStorage.removeItem('gh_session'); // Efface la session
+  localStorage.removeItem('gh_session'); // Efface la session
   document.getElementById('pinSection').style.display='none';
   document.getElementById('loginSub').textContent='Sélectionnez votre profil';
   document.getElementById('app').style.display='none';
@@ -1019,7 +1019,8 @@ function initApp(){
     const as=document.getElementById('adminSurl');if(as)as.value=S.surl;
   }
   // Sauvegarde la session pour survivre aux rafraîchissements
-  sessionStorage.setItem('gh_session', CU.id);
+  // Session persistante (survit aux refresh, PWA, onglets restaurés)
+  localStorage.setItem('gh_session', JSON.stringify({uid:CU.id, ts:Date.now()}));
   renderAll();
   goPage('dashboard');
   addNotif('Connexion réussie','Bienvenue '+CU.name.split(' ')[0]+' !','i');
@@ -1925,24 +1926,30 @@ populatePoleSelect('mp-pole');
 populatePoleSelect('mu-pole');
 renderColorPicker(AVATAR_COLORS[0]);
 
-// ── Restauration de session ──
-const savedSession = sessionStorage.getItem('gh_session');
-if(savedSession){
-  const savedUser = S.users.find(u => u.id === savedSession);
-  if(savedUser){
-    // Reconnexion automatique sans PIN
-    CU = savedUser;
-    document.getElementById('loginScreen').style.display='none';
-    document.getElementById('app').style.display='grid';
-    initApp();
-  } else {
-    // Utilisateur introuvable (supprimé ?), retour login
-    sessionStorage.removeItem('gh_session');
-    renderLogin();
-  }
-} else {
-  renderLogin();
-}
+// ── Restauration de session (localStorage, timeout 8h) ──
+(function(){
+  const SESSION_TTL = 8 * 60 * 60 * 1000; // 8 heures
+  try {
+    const raw = localStorage.getItem('gh_session');
+    if(raw){
+      const sess = JSON.parse(raw);
+      const age  = Date.now() - (sess.ts || 0);
+      if(age < SESSION_TTL){
+        const savedUser = S.users.find(u => u.id === sess.uid);
+        if(savedUser){
+          CU = savedUser;
+          document.getElementById('loginScreen').style.display = 'none';
+          document.getElementById('app').style.display = 'grid';
+          initApp();
+          return; // ← Ne pas appeler renderLogin()
+        }
+      }
+      // Session expirée ou user introuvable
+      localStorage.removeItem('gh_session');
+    }
+  } catch(e){ localStorage.removeItem('gh_session'); }
+  renderLogin(); // Aucune session valide
+})();
 
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
