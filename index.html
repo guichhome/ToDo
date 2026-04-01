@@ -912,6 +912,9 @@ function seedDemo(){
 function startTimer(id){
   const t=S.tasks.find(x=>x.id===id);
   if(!t||t.done||t.deleted)return;
+  if(!CU)return;
+  const canTimer=CU.role==='admin'||CU.role==='manager'||(t.assignees&&t.assignees.includes(CU.id))||(t.createdBy&&t.createdBy===CU.id);
+  if(!canTimer){toast('🔒 Seuls les utilisateurs assignés peuvent démarrer le chrono','w');return;}
   S.tasks.forEach(x=>{if(x.timerRunning&&x.id!==id)stopTimer(x.id);});
   t.timerRunning=true;t.timerStart=Date.now();
   if(t.status==='todo'){t.status='inprogress';}
@@ -1434,21 +1437,26 @@ function tcard(t,arch,showProj){
 // ── TASK ACTIONS ──
 function toggleDone(id){
   const t=S.tasks.find(x=>x.id===id);if(!t)return;
+  if(!canEditTask(t)){toast('🔒 Vous ne pouvez pas modifier cette tâche','w');return;}
   if(t.timerRunning)stopTimer(id);
   t.done=!t.done;t.status=t.done?'done':'inprogress';
   save();renderAll();toast(t.done?'✓ Validée !':'Réactivée','s');
 }
 function archiveTask(id){
-  const t=S.tasks.find(x=>x.id===id);if(t){t.archived=true;save();renderAll();toast('📦 Archivée','i');}
+  const t=S.tasks.find(x=>x.id===id);if(!t)return;
+  if(!canEditTask(t)){toast('🔒 Action non autorisée','w');return;}
+  t.archived=true;save();renderAll();toast('📦 Archivée','i');
 }
 function restoreTask(id){
   const t=S.tasks.find(x=>x.id===id);
   if(t){t.archived=false;t.deleted=false;save();renderAll();toast('↩ Restaurée','s');}
 }
 function softDeleteTask(id){
+  const t=S.tasks.find(x=>x.id===id);
+  if(!t)return;
+  if(!canEditTask(t)){toast('🔒 Vous ne pouvez pas supprimer cette tâche','w');return;}
   openConfirm('Supprimer cette tâche ?','La tâche sera archivée dans la corbeille.',()=>{
-    const t=S.tasks.find(x=>x.id===id);
-    if(t){if(t.timerRunning)stopTimer(id);t.deleted=true;t.deletedAt=Date.now();save();renderAll();toast('📦 Déplacée en corbeille','w');}
+    if(t.timerRunning)stopTimer(id);t.deleted=true;t.deletedAt=Date.now();save();renderAll();toast('📦 Déplacée en corbeille','w');
   });
 }
 function archiveProject(id){
@@ -1698,6 +1706,11 @@ function openNewTask(){
 function showTaskReadOnly(name){toast('👁 "'+name.slice(0,25)+'" — lecture seule','i');}
 function openEditTask(id){
   const t=S.tasks.find(x=>x.id===id);if(!t)return;
+  // Permission check — toujours vérifier, peu importe l'appel
+  if(!canEditTask(t)){
+    toast('🔒 Tâche en lecture seule — vous n\'êtes pas assigné','w');
+    return;
+  }
   document.getElementById('editTaskId').value=t.id;
   document.getElementById('moTaskTitle').textContent='Modifier la tâche';
   document.getElementById('mt-n').value=t.name;
@@ -1743,6 +1756,14 @@ function saveTask(){
   const name=document.getElementById('mt-n').value.trim();
   if(!name){toast('Entrez un nom','e');return;}
   const editId=document.getElementById('editTaskId').value;
+  // Vérifie les droits si c'est une modif
+  if(editId){
+    const existing=S.tasks.find(x=>x.id===editId);
+    if(existing&&!canEditTask(existing)){
+      toast('🔒 Vous ne pouvez pas modifier cette tâche','e');
+      closeModal('moTask');return;
+    }
+  }
   const pole=getSelectedPole();
   const assignees=[...document.querySelectorAll('#userPicker .user-sel-chip.sel')].map(el=>{
     const idx=[...document.querySelectorAll('#userPicker .user-sel-chip')].indexOf(el);
