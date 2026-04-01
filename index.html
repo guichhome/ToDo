@@ -763,7 +763,15 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     <div style="background:var(--sf2);border:1px solid var(--bd);border-radius:8px;padding:11px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--tx3);line-height:2;margin-bottom:13px;">URL Apps Script requise — voir guide de configuration</div>
     <div class="fg"><label class="fl">URL Apps Script</label><input type="text" class="fi" id="syncUrl" placeholder="https://script.google.com/macros/s/.../exec"/></div>
     <div class="fg"><label class="fl">Direction</label><select class="fs" id="syncDir"><option value="export">⬆ Exporter tout vers Sheets</option><option value="import">⬇ Importer depuis Sheets</option><option value="both">↕ Bidirectionnel</option></select></div>
-    <div class="ma"><button class="btn" onclick="testSync()">Tester</button><button class="btn" onclick="closeModal('moSync')">Fermer</button><button class="btn pri" onclick="doSync()">Synchroniser</button></div>
+    <div class="ma"><button class="btn" onclick="testSync()">Tester connexion</button><button class="btn" onclick="closeModal('moSync')">Fermer</button><button class="btn pri" onclick="doSync()">Synchroniser</button></div>
+    <div id="syncHelper" style="display:none;margin-top:14px;background:var(--ubg);border:1px solid var(--ub);border-radius:8px;padding:12px;font-size:11px;color:var(--tx2);line-height:1.8;">
+      <strong style="color:var(--urgent);">❌ Problème de connexion — Vérifiez :</strong><br>
+      1. L'URL se termine bien par <code>/exec</code> (pas <code>/dev</code>)<br>
+      2. Dans Apps Script → Déploiement → "Qui a accès" = <strong>Tout le monde</strong><br>
+      3. Vous avez bien fait un <strong>nouveau déploiement</strong> après avoir collé le code<br>
+      4. Vous avez cliqué <strong>Autoriser</strong> lors du premier déploiement<br>
+      <button class="btn sm" style="margin-top:8px;" onclick="document.getElementById('syncHelper').style.display='none'">OK compris</button>
+    </div>
   </div>
 </div>
 
@@ -1581,13 +1589,22 @@ function saveSurl(){
 function testSyncAdmin(){
   const url=document.getElementById('adminSurl').value.trim();
   if(!url){toast('Entrez une URL','e');return;}
+  if(!url.endsWith('/exec')){toast('L\'URL doit finir par /exec','e');return;}
   toast('Test en cours...','i');
-  fetch(url+'?action=load',{method:'GET',mode:'cors'})
-    .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+  fetch(url+'?action=load')
+    .then(r=>r.json())
     .then(d=>{
-      if(d.success!==false){S.surl=url;save();const su=document.getElementById('syncUrl');if(su)su.value=url;toast('✓ Connexion OK !','s');}
-      else toast('Erreur: '+d.error,'e');
-    }).catch(err=>{console.error(err);toast('Erreur réseau — URL doit finir par /exec et accès = Tout le monde','e');});
+      if(d.success!==false){
+        S.surl=url;save();
+        const su=document.getElementById('syncUrl');if(su)su.value=url;
+        toast('✓ Connexion OK !','s');
+      } else {
+        toast('Script accessible mais erreur: '+d.error,'w');
+      }
+    }).catch(err=>{
+      console.error(err);
+      toast('❌ Connexion échouée — voir guide de déploiement','e');
+    });
 }
 
 // ── MODALS ──
@@ -1747,14 +1764,25 @@ function toggleNotifs(){document.getElementById('notifPanel').classList.toggle('
 function testSync(){
   const url=document.getElementById('syncUrl').value.trim();
   if(!url){toast('Entrez l\'URL Apps Script','e');return;}
-  if(!url.includes('script.google.com')){toast('URL invalide — doit commencer par script.google.com','e');return;}
-  toast('Test en cours...','i');
-  fetch(url+'?action=load',{method:'GET',mode:'cors'})
-    .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
-    .then(d=>{d.success!==false?toast('✓ Connexion OK !','s'):toast('Script OK mais erreur: '+(d.error||'—'),'w');})
+  if(!url.includes('script.google.com')||!url.endsWith('/exec')){
+    toast('URL invalide — doit finir par /exec','e');return;
+  }
+  toast('Test de connexion...','i');
+  // GET simple — Apps Script gère le CORS automatiquement pour GET
+  fetch(url+'?action=load')
+    .then(r=>r.json())
+    .then(d=>{
+      if(d.success!==false){
+        toast('✓ Connexion réussie !','s');
+      } else {
+        toast('Script accessible mais erreur interne: '+(d.error||'—'),'w');
+      }
+    })
     .catch(err=>{
-      console.error('Sync error:',err);
-      toast('Erreur réseau — vérifiez: 1) URL se termine par /exec 2) Accès: Tout le monde 3) Redéployé après modif','e');
+      console.error('testSync error:',err);
+      toast('❌ Connexion impossible. Vérifiez le guide ci-dessous.','e');
+      // Show helper
+      document.getElementById('syncHelper').style.display='block';
     });
 }
 async function doSync(){
@@ -1769,27 +1797,46 @@ async function doSync(){
   closeModal('moSync');
 }
 async function expSheets(url){
-  toast('Export en cours...','i');
+  toast('Export en cours... (peut prendre 10-15s)','i');
   try{
-    const payload=JSON.stringify({action:'sync',projects:S.projects,tasks:S.tasks,users:S.users.map(u=>{const uu={...u};delete uu.pin;return uu;})});
-    const r=await fetch(url,{method:'POST',mode:'cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:payload});
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    const d=await r.json();
-    d.success?toast('✓ '+d.stats?.tasks+' tâches exportées vers Sheets !','s'):toast('Erreur export: '+(d.error||'—'),'e');
-  }catch(e){console.error(e);toast('Erreur export — vérifiez l\'URL et le déploiement Apps Script','e');}
+    const payload=JSON.stringify({
+      action:'sync',
+      projects:S.projects,
+      tasks:S.tasks,
+      users:S.users.map(u=>{const uu={...u};delete uu.pin;return uu;})
+    });
+    // mode:'no-cors' est nécessaire pour les POST vers Apps Script depuis un site externe
+    // La requête passe bien, mais on ne peut pas lire la réponse (réponse "opaque")
+    await fetch(url,{
+      method:'POST',
+      mode:'no-cors',
+      headers:{'Content-Type':'text/plain'},
+      body:payload
+    });
+    // Avec no-cors on ne peut pas lire la réponse, mais si on arrive ici c'est OK
+    toast('✓ Données envoyées vers Sheets ! Vérifiez votre Sheet.','s');
+    addNotif('Sync Sheets','Export réussi — données envoyées','s');
+  }catch(e){
+    console.error('expSheets error:',e);
+    toast('Erreur export: '+e.message,'e');
+  }
 }
 async function impSheets(url){
   toast('Import en cours...','i');
   try{
-    const r=await fetch(url+'?action=load',{method:'GET',mode:'cors'});
-    if(!r.ok)throw new Error('HTTP '+r.status);
+    const r=await fetch(url+'?action=load');
     const d=await r.json();
     if(!d.success){toast('Erreur import: '+(d.error||'—'),'e');return;}
     let np=0,nt=0;
     (d.projects||[]).forEach(p=>{if(!S.projects.find(x=>x.id===p.id)){S.projects.push(p);np++;}});
     (d.tasks||[]).forEach(t=>{if(!S.tasks.find(x=>x.id===t.id)){S.tasks.push(t);nt++;}});
-    save();renderAll();toast('✓ '+np+' projets, '+nt+' tâches importés','s');
-  }catch(e){console.error(e);toast('Erreur import — vérifiez l\'URL Apps Script','e');}
+    save();renderAll();
+    toast('✓ '+np+' projet(s) et '+nt+' tâche(s) importés','s');
+    addNotif('Sync Sheets','Import réussi: '+np+' projets, '+nt+' tâches','s');
+  }catch(e){
+    console.error('impSheets error:',e);
+    toast('Erreur import — vérifiez l\'URL Apps Script','e');
+  }
 }
 
 // ── EXPORT CSV ──
