@@ -997,7 +997,7 @@ async function logout(){
   document.getElementById('loginScreen').style.display='flex';
   renderLogin();
 }
-function initApp(){
+function initApp(sessionRestore=false){
   document.getElementById('headerAvatar').textContent=CU.initials;
   document.getElementById('headerAvatar').style.background=CU.color;
   document.getElementById('headerName').textContent=CU.name.split(' ')[0];
@@ -1023,7 +1023,7 @@ function initApp(){
   localStorage.setItem('gh_session', JSON.stringify({uid:CU.id, ts:Date.now()}));
   renderAll();
   goPage('dashboard');
-  addNotif('Connexion réussie','Bienvenue '+CU.name.split(' ')[0]+' !','i');
+  if(!sessionRestore)addNotif('Connexion réussie','Bienvenue '+CU.name.split(' ')[0]+' !','i');
 }
 
 // ── NAVIGATION ──
@@ -1940,7 +1940,7 @@ renderColorPicker(AVATAR_COLORS[0]);
           CU = savedUser;
           document.getElementById('loginScreen').style.display = 'none';
           document.getElementById('app').style.display = 'grid';
-          initApp();
+          initApp(true); // Session restore, pas de notif Bienvenue
           return; // ← Ne pas appeler renderLogin()
         }
       }
