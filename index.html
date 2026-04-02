@@ -2351,15 +2351,16 @@ function testSync(){
     toast('URL invalide — doit finir par /exec','e');return;
   }
   toast('Test de connexion...','i');
+  // Test GET (lecture)
   fetch(url+'?action=load')
     .then(r=>r.json())
-    .then(d=>{
-      if(d.success!==false){
-        // Affiche combien de données sont dans Sheets
-        const info=d.tasks?(' — '+d.tasks.length+' tâches, '+d.projects.length+' projets dans Sheets'):'';
-        toast('✓ Connexion OK'+info,'s');
+    .then(async d=>{
+      if(d.success && (d.tasks||[]).length > 0){
+        toast('✓ Connexion OK — '+d.tasks.length+' tâches, '+d.projects.length+' projets dans Sheets','s');
+      } else if(d.success){
+        toast('✓ Connexion OK mais Sheets est vide — cliquez 💾 Sauvegarder','w');
       } else {
-        toast('Sheets accessible mais sans données: '+(d.error||'Faites une sauvegarde d\'abord'),'w');
+        toast('Sheets accessible: '+(d.error||'Faites une sauvegarde d\'abord'),'w');
       }
     })
     .catch(err=>{
@@ -2382,49 +2383,58 @@ async function doSync(){
 async function expSheets(url, silent=false){
   if(!silent) toast('Sauvegarde en cours...','i');
   try{
-    const data={
+    const payload=JSON.stringify({
       action:'sync',
       projects:S.projects,
       tasks:S.tasks,
       users:S.users.map(u=>{const uu={...u};delete uu.pin;return uu;}),
       tsec:S.tsec
-    };
-    const json=JSON.stringify(data);
+    });
 
-    // ── Stratégie : POST classique sans mode no-cors ──
-    // Apps Script supporte le CORS correctement quand déployé "Tout le monde"
-    let r, d;
-    try{
-      r=await fetch(url,{
-        method:'POST',
-        headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body:json
-      });
-      d=await r.json();
-    }catch(corsErr){
-      // Fallback : GET avec données encodées (pour les cas où POST est bloqué)
-      console.warn('POST bloqué, tentative GET fallback...',corsErr.message);
-      const encoded=encodeURIComponent(json);
-      // Si trop long pour GET, tronquer (logs seulement)
-      if(encoded.length<8000){
-        r=await fetch(url+'?action=sync&data='+encoded);
-        d=await r.json();
-      }else{
-        throw new Error('Données trop volumineuses pour GET fallback. Vérifiez le déploiement Apps Script.');
+    // ── Envoi POST no-cors ──
+    // no-cors = data envoyée, réponse non lisible (normal pour Apps Script cross-origin)
+    await fetch(url, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: {'Content-Type': 'text/plain'},
+      body: payload
+    });
+
+    // ── Vérification via GET (Apps Script retourne bien CORS sur GET) ──
+    // On attend 3s que Apps Script ait fini d'écrire dans le Sheet
+    await new Promise(res => setTimeout(res, 3000));
+    const verify = await fetch(url + '?action=load');
+    const result = await verify.json();
+
+    if(result.success && (result.tasks||[]).length > 0){
+      const nb = (result.tasks||[]).length;
+      if(!silent) toast('✓ Sauvegardé ! ('+nb+' tâches dans Sheets)','s');
+      addNotif('Sauvegarde',''+nb+' tâches synchronisées','s');
+    } else if(result.success){
+      // Sheets vide — POST n'a peut-être pas fonctionné
+      // Tentative fallback : GET avec data encodée (petits volumes)
+      const encoded = encodeURIComponent(payload);
+      if(encoded.length <= 7500){
+        if(!silent) toast('Tentative fallback GET...','w');
+        const fb = await fetch(url + '?action=sync&data=' + encoded);
+        const fbResult = await fb.json();
+        if(fbResult.success){
+          if(!silent) toast('✓ Sauvegardé via fallback !','s');
+        } else {
+          throw new Error('Fallback échoué: ' + (fbResult.error||'—'));
+        }
+      } else {
+        // Données trop volumineuses pour GET → POST no-cors est la seule option
+        // Si Sheets est vide c'est que Apps Script n'a pas reçu le POST
+        if(!silent) toast('⚠ Vérifiez le déploiement Apps Script (voir Admin)','e');
+        console.error('Sheets vide après POST. Apps Script ne reçoit pas le body. Redéployez en "Nouveau déploiement".');
       }
-    }
-
-    if(d&&d.success){
-      if(!silent) toast('✓ Sauvegardé ! ('+((d.stats&&d.stats.tasks)||0)+' tâches)','s');
-      addNotif('Sauvegarde','Export Sheets réussi','s');
     } else {
-      const msg=(d&&d.error)||'Erreur inconnue';
-      console.error('expSheets error:',msg);
-      if(!silent) toast('Erreur sauvegarde: '+msg,'e');
+      throw new Error(result.error || 'Erreur inconnue');
     }
   }catch(e){
-    console.error('expSheets exception:',e.message);
-    if(!silent) toast('Erreur réseau — vérifiez l\'URL Apps Script','e');
+    console.error('expSheets:', e.message);
+    if(!silent) toast('Erreur: '+e.message.slice(0,60),'e');
   }
 }
 
