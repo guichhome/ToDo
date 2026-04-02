@@ -329,14 +329,15 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .tc{
   background:var(--sf);border:1px solid var(--bd);border-left:3px solid var(--ok);
   border-radius:var(--rs);padding:10px 12px;
-  display:grid;grid-template-columns:22px 1fr auto;gap:11px;align-items:center;
+  display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;
   transition:all var(--tr);
 }
 /* Compact mode for all-tasks and pole pages */
 .tc.compact{padding:6px 10px;gap:8px;}
-.tc.compact .tn{font-size:12px;margin-bottom:1px;}
+.tc.compact .tn{font-size:12px;margin-bottom:2px;}
 .tc.compact .tm{gap:4px;}
-.tc.compact .ttime{font-size:13px;}
+.tc.compact .ttime{font-size:12px;}
+.tc.compact .trow{margin-top:5px;}
 .tasks-list.compact-list{gap:3px;}
 .tc.urg{border-left-color:var(--urgent);}
 .tc.done{opacity:.38;}.tc.done .tn{text-decoration:line-through;color:var(--tx3);}
@@ -352,8 +353,16 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .tn{font-size:13px;font-weight:500;color:var(--tx);margin-bottom:3px;}
 .tm{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
 .test{font-size:11px;color:var(--tx3);}
-.ttmr{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;}
-.ttime{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:500;color:var(--tx3);line-height:1;transition:color var(--tr);}
+.ttmr{display:none;} /* legacy - now inside card */
+/* Timer row: lives inside .tb at the bottom */
+.trow{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top:7px;padding-top:6px;border-top:1px solid var(--bd);
+  gap:8px;flex-wrap:wrap;
+}
+.trow-left{display:flex;align-items:center;gap:6px;}
+.trow-right{display:flex;align-items:center;gap:4px;}
+.ttime{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;color:var(--tx3);line-height:1;transition:color var(--tr);}
 .tc.run .ttime{color:var(--brand);}
 .tvs{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--tx4);text-align:right;}
 .tvs.over{color:var(--urgent);}.tvs.under{color:var(--ok);}
@@ -499,8 +508,9 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   aside{display:none;}.app.sidebar-open aside{display:flex;position:fixed;left:0;top:56px;bottom:0;z-index:80;width:240px;}
   .kanban-board{grid-template-columns:repeat(5,minmax(160px,1fr));}
   .fr,.fr3,.admin-grid{grid-template-columns:1fr;}
-  .ttmr{display:none;}
   .kpi-grid{grid-template-columns:repeat(2,1fr);}
+  .trow-right .tbt{width:24px;height:24px;font-size:10px;}
+  .ttime{font-size:12px;}
 }
 </style>
 </head>
@@ -1491,38 +1501,59 @@ function tcard(t,arch,showProj,compact){
   const p=S.projects.find(x=>x.id===t.project);
   const pole=POLES.find(x=>x.id===t.pole);
   const us=S.users.filter(u=>t.assignees&&t.assignees.includes(u.id));
-  const vs=t.estimate&&t.elapsed>0?(()=>{const d=t.elapsed-t.estimate*60;return `<div class="tvs ${d>0?'over':'under'}" id="vs-${t.id}">${d>0?'+'+fmt(d)+' dépassé':fmt(-d)+' restant'}</div>`;})():`<div class="tvs" id="vs-${t.id}"></div>`;
   const editable=canEditTask(t);
   const isTimerUser=!CU||(t.assignees&&t.assignees.includes(CU.id))||CU.role==='admin'||CU.role==='manager';
   const _tbClick=editable?'onclick="openEditTask(\''+t.id+'\')"':'';
   const _tbStyle=editable?'':'style="cursor:default"';
 
-  return `<div class="tc ${t.priority==='urgent'?'urg':''} ${t.done?'done':''} ${t.timerRunning?'run':''} ${!editable?'tc-readonly':''} ${compact?'compact':''}" id="tc-${t.id}">
-    <div class="tck ${t.done?'on':''}" onclick="${editable?`toggleDone('${t.id}')`:``}" style="${editable?'':'cursor:not-allowed;opacity:.35;pointer-events:none'}" title="${editable?'Valider':'Lecture seule'}"></div>
-    <div class="tb" ${_tbClick} ${_tbStyle}>
-      <div class="tn">${t.name}${!editable?'<span style="font-size:9px;color:var(--tx3);opacity:.7;margin-left:3px;">👁</span>':''}</div>
-        <span class="badge ${t.done?'done-b':t.priority==='urgent'?'urg':'norm'}">${t.priority==='urgent'?'🔴 Urgent':'🟢 Normal'}</span>
-        ${pole?`<span class="badge pole-badge pole-${pole.id}">${pole.ico} ${pole.label}</span>`:''}
-        ${showProj&&p?`<span class="badge" style="background:var(--brand-xs);color:var(--brand-d);border:1px solid rgba(212,135,58,.22);">🏗 ${p.name.slice(0,15)}</span>`:''}
-        ${us.map(u=>`<div class="kc-avatar" style="background:${u.color};width:18px;height:18px;font-size:8px;" title="${u.name}">${u.initials}</div>`).join('')}
-        ${t.estimate?`<span class="test">⏳${t.estimate>=60?Math.floor(t.estimate/60)+'h'+(t.estimate%60?t.estimate%60+'m':''):t.estimate+'m'}</span>`:''}
-        ${t.notes?`<span class="test" title="${t.notes}">📝</span>`:''}
-      </div>
-    </div>
-    <div class="ttmr">
-      <div class="ttime" id="td-${t.id}">${fmt(t.elapsed)}</div>
-      ${vs}
-      <div class="tcc">
-        ${isTimerUser&&!t.done?(t.timerRunning?`<button class="tbt stop" onclick="stopTimer('${t.id}')" title="Stop">⏹</button>`:`<button class="tbt play" onclick="startTimer('${t.id}')" title="Démarrer">▶</button>`):''}
-        ${isTimerUser?`<button class="tbt" onclick="resetTimer('${t.id}')" title="Reset">↺</button>`:''}
-        ${editable&&t.done&&!arch?`<button class="tbt" onclick="archiveTask('${t.id}')" title="Archiver" style="color:var(--brand-d)">📦</button>`:''}
-        ${arch&&(CU&&(CU.role==='admin'||CU.role==='manager'))?`<button class="tbt" onclick="restoreTask('${t.id}')" title="Restaurer" style="color:var(--ok)">↩</button>`:''}
-        ${editable?`<button class="tbt del" onclick="softDeleteTask('${t.id}')" title="Supprimer" style="color:var(--tx4)">×</button>`:''}
-      </div>
-    </div>
-  </div>`;
-}
+  // Timer vs estimate
+  let vsHtml='';
+  if(t.estimate&&t.elapsed>0){
+    const d=t.elapsed-t.estimate*60;
+    vsHtml=d>0
+      ?'<span class="tvs over" id="vs-'+t.id+'">+'+fmt(d)+'</span>'
+      :'<span class="tvs under" id="vs-'+t.id+'">'+fmt(-d)+' rest.</span>';
+  } else {
+    vsHtml='<span class="tvs" id="vs-'+t.id+'"></span>';
+  }
 
+  // Timer controls
+  let timerBtns='';
+  if(isTimerUser&&!t.done){
+    timerBtns+=t.timerRunning
+      ?'<button class="tbt stop" onclick="stopTimer(\''+t.id+'\')">⏹</button>'
+      :'<button class="tbt play" onclick="startTimer(\''+t.id+'\')">▶</button>';
+    timerBtns+='<button class="tbt" onclick="resetTimer(\''+t.id+'\')">↺</button>';
+  }
+  if(editable&&t.done&&!arch) timerBtns+='<button class="tbt arch" onclick="archiveTask(\''+t.id+'\')">📦</button>';
+  if(arch&&CU&&(CU.role==='admin'||CU.role==='manager')) timerBtns+='<button class="tbt" onclick="restoreTask(\''+t.id+'\')">↩</button>';
+  if(editable) timerBtns+='<button class="tbt del" onclick="softDeleteTask(\''+t.id+'\')">×</button>';
+
+  // Bottom timer row
+  const timerRow='<div class="trow">'+
+    '<div class="trow-left">'+
+      '<span class="ttime" id="td-'+t.id+'">'+fmt(t.elapsed)+'</span>'+
+      vsHtml+
+      (t.estimate?'<span class="test" style="opacity:.6;">/ '+(t.estimate>=60?Math.floor(t.estimate/60)+'h'+(t.estimate%60?t.estimate%60+'m':''):t.estimate+'m')+'</span>':'')+
+    '</div>'+
+    '<div class="trow-right">'+timerBtns+'</div>'+
+  '</div>';
+
+  return '<div class="tc '+(t.priority==='urgent'?'urg':'')+' '+(t.done?'done':'')+' '+(t.timerRunning?'run':'')+' '+(!editable?'tc-readonly':'')+' '+(compact?'compact':'')+'" id="tc-'+t.id+'">'+
+    '<div class="tck '+(t.done?'on':'')+'" onclick="'+(editable?'toggleDone(\''+t.id+'\')':'')+'" style="'+(editable?'':'cursor:not-allowed;opacity:.35;pointer-events:none')+'" title="'+(editable?'Valider':'Lecture seule')+'"></div>'+
+    '<div class="tb" '+_tbClick+' '+_tbStyle+'>'+
+      '<div class="tn">'+t.name+(editable?'':'<span style="font-size:9px;color:var(--tx3);opacity:.7;margin-left:3px;">👁</span>')+'</div>'+
+      '<div class="tm" style="margin-top:4px;">'+
+        '<span class="badge '+(t.done?'done-b':t.priority==='urgent'?'urg':'norm')+'">'+(t.priority==='urgent'?'🔴 Urgent':'🟢 Normal')+'</span>'+
+        (pole?'<span class="badge pole-badge pole-'+pole.id+'">'+pole.ico+' '+pole.label+'</span>':'')+
+        (showProj&&p?'<span class="badge" style="background:var(--brand-xs);color:var(--brand-d);border:1px solid rgba(212,135,58,.22);">🏗 '+p.name.slice(0,18)+'</span>':'')+
+        us.map(u=>'<div class="kc-avatar" style="background:'+u.color+';width:18px;height:18px;font-size:8px;" title="'+u.name+'">'+u.initials+'</div>').join('')+
+        (t.notes?'<span class="test" title="'+t.notes+'">📝</span>':'')+
+      '</div>'+
+      timerRow+
+    '</div>'+
+  '</div>';
+}
 // ── TASK ACTIONS ──
 function toggleDone(id){
   const t=S.tasks.find(x=>x.id===id);if(!t)return;
