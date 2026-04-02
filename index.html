@@ -721,6 +721,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 <div class="mo" id="moTask">
   <div class="mbox wide">
     <div class="mt" id="moTaskTitle">Nouvelle tâche</div>
+    <div id="taskScopeNote" style="display:none;background:var(--brand-xs);border:1px solid rgba(212,135,58,.25);border-radius:6px;padding:8px 12px;font-size:12px;color:var(--tx2);margin-bottom:12px;"></div>
     <input type="hidden" id="editTaskId"/>
     <div class="fg"><label class="fl">Nom de la tâche *</label><input type="text" class="fi" id="mt-n" placeholder="Ex: Pose des dormants fenêtre salon"/></div>
     <div class="fr">
@@ -1751,9 +1752,37 @@ function openNewTask(){
   document.getElementById('mt-dend').value='';
   document.getElementById('mt-prio').value='normal';
   populateProjectSelect('mt-proj');
+  // Filtre les projets selon le pôle de l'employé
+  const isAdm=CU&&(CU.role==='admin'||CU.role==='manager');
+  if(!isAdm&&CU&&CU.pole){
+    const pjSel=document.getElementById('mt-proj');
+    const opts=[...pjSel.options];
+    opts.forEach(o=>{
+      if(o.value){
+        const p=S.projects.find(x=>x.id===o.value);
+        if(p&&p.pole&&p.pole!==CU.pole)o.style.display='none';
+        else o.style.display='';
+      }
+    });
+  }
   if(S.curProjId&&S.cur==='detail')document.getElementById('mt-proj').value=S.curProjId;
-  renderPolePicker(S.curPole||'');
-  renderUserPicker([CU?CU.id:'']);
+  // Pré-sélectionne le pôle de l'employé (ou le pôle courant pour l'admin)
+  const defaultPole=!isAdm&&CU?CU.pole:(S.curPole||'');
+  renderPolePicker(defaultPole);
+  // Pré-sélectionne l'utilisateur courant
+  renderUserPicker(CU?[CU.id]:[]);
+  // Affiche la note de périmètre pour les employés
+  const scopeNote=document.getElementById('taskScopeNote');
+  if(scopeNote){
+    const isAdm2=CU&&(CU.role==='admin'||CU.role==='manager');
+    if(!isAdm2&&CU){
+      const pole=POLES.find(p=>p.id===CU.pole);
+      scopeNote.style.display='block';
+      scopeNote.textContent='🔒 Vous créez une tâche pour votre pôle '+(pole?pole.ico+' '+pole.label:'')+ ' — assignée à vous-même.';
+    }else{
+      scopeNote.style.display='none';
+    }
+  }
   openModal('moTask');
   setTimeout(()=>document.getElementById('mt-n').focus(),80);
 }
@@ -1777,13 +1806,41 @@ function openEditTask(id){
   document.getElementById('mt-proj').value=t.project||'';
   renderPolePicker(t.pole||'');
   renderUserPicker(t.assignees||[]);
+  // Note de périmètre
+  const scopeNoteE=document.getElementById('taskScopeNote');
+  if(scopeNoteE){
+    const isAdmE=CU&&(CU.role==='admin'||CU.role==='manager');
+    if(!isAdmE&&CU){
+      const poleE=POLES.find(p=>p.id===CU.pole);
+      scopeNoteE.style.display='block';
+      scopeNoteE.textContent='🔒 Modification limitée à votre pôle '+(poleE?poleE.ico+' '+poleE.label:'');
+    }else{
+      scopeNoteE.style.display='none';
+    }
+  }
   openModal('moTask');
 }
 function renderPolePicker(selected){
-  document.getElementById('polePicker').innerHTML=POLES.map(p=>`
-    <div class="pole-opt ${p.id===selected?'sel':''} pole-${p.id}" style="${p.id===selected?'border-color:var('+p.color+');background:var('+p.color+',#fff)':''}" onclick="selectPole('${p.id}',this)">
+  const isAdmin=CU&&(CU.role==='admin'||CU.role==='manager');
+  // Employé : uniquement son propre pôle, non modifiable
+  const allowedPoles=isAdmin?POLES:POLES.filter(p=>p.id===(CU?CU.pole:''));
+  // Si pôle employé vide → tous les pôles autorisés (sécurité)
+  const visiblePoles=allowedPoles.length>0?allowedPoles:POLES;
+  // Forcer la sélection sur le bon pôle pour l'employé
+  const forcedSelected=!isAdmin&&CU&&CU.pole?CU.pole:selected;
+  document.getElementById('polePicker').innerHTML=visiblePoles.map(p=>`
+    <div class="pole-opt ${p.id===forcedSelected?'sel':''} pole-${p.id}"
+      style="${p.id===forcedSelected?'border-color:var('+p.color+');':'opacity:.9'}"
+      onclick="${isAdmin?`selectPole('${p.id}',this)`:''}">
       ${p.ico} ${p.label}
+      ${!isAdmin?'<span style="font-size:9px;display:block;color:inherit;opacity:.7;margin-top:2px;">Votre pôle</span>':''}
     </div>`).join('');
+  // Pour l'employé, s'assurer que son pôle est bien sélectionné
+  if(!isAdmin&&CU&&CU.pole){
+    // Forcer la valeur interne
+    const el=document.querySelector('#polePicker .pole-opt');
+    if(el)el.classList.add('sel');
+  }
 }
 function selectPole(id,el){
   document.querySelectorAll('#polePicker .pole-opt').forEach(x=>x.classList.remove('sel'));
@@ -1792,20 +1849,41 @@ function selectPole(id,el){
   if(pole){el.style.borderColor='var('+pole.color+')';el.style.background='';}
 }
 function getSelectedPole(){
+  const isAdmin=CU&&(CU.role==='admin'||CU.role==='manager');
+  if(!isAdmin&&CU&&CU.pole) return CU.pole; // Employé : son pôle uniquement
   const sel=document.querySelector('#polePicker .pole-opt.sel');
   if(!sel)return'';
-  const idx=[...document.querySelectorAll('#polePicker .pole-opt')].indexOf(sel);
-  return POLES[idx]?.id||'';
+  const idx3=[...document.querySelectorAll('#polePicker .pole-opt')].indexOf(sel);
+  const isAdminX=CU&&(CU.role==='admin'||CU.role==='manager');
+  const visiblePoles=isAdminX?POLES:POLES.filter(p=>p.id===(CU?CU.pole:''));
+  return visiblePoles[idx3]?.id||'';
 }
 function renderUserPicker(selectedIds){
-  document.getElementById('userPicker').innerHTML=S.users.map(u=>`
-    <div class="user-sel-chip ${selectedIds.includes(u.id)?'sel':''}" onclick="toggleUserSel('${u.id}',this)">
+  const isAdmin=CU&&(CU.role==='admin'||CU.role==='manager');
+  // Employé : voit uniquement lui-même, pré-sélectionné, non modifiable
+  const visibleUsers=isAdmin?S.users:(CU?S.users.filter(u=>u.id===CU.id):[]);
+  const forcedSelected=!isAdmin&&CU?[CU.id]:selectedIds;
+  document.getElementById('userPicker').innerHTML=visibleUsers.map(u=>`
+    <div class="user-sel-chip ${forcedSelected.includes(u.id)?'sel':''}"
+      onclick="${isAdmin?`toggleUserSel('${u.id}',this)`:''}"
+      style="${!isAdmin?'cursor:default;':''}"
+      title="${!isAdmin?'Vous êtes automatiquement assigné':'Cliquer pour assigner'}">
       <div class="sm-av" style="background:${u.color}">${u.initials}</div>
       ${u.name.split(' ')[0]}
+      ${!isAdmin?'<span style="font-size:9px;opacity:.6;margin-left:3px;">✓</span>':''}
     </div>`).join('');
 }
 function toggleUserSel(id,el){el.classList.toggle('sel');}
-function getSelectedUsers(){return [...document.querySelectorAll('#userPicker .user-sel-chip.sel')].map((_,i)=>S.users[i].id).filter(Boolean);}
+function getSelectedUsers(){
+  const isAdmin=CU&&(CU.role==='admin'||CU.role==='manager');
+  if(!isAdmin&&CU) return [CU.id]; // Employé : toujours lui-même
+  return [...document.querySelectorAll('#userPicker .user-sel-chip.sel')].map((el,_,arr)=>{
+    const idx2=[...document.querySelectorAll('#userPicker .user-sel-chip')].indexOf(el);
+    // find which user corresponds to this chip position
+    const visibleUsers=S.users;
+    return visibleUsers[idx2]?.id;
+  }).filter(Boolean);
+}
 function saveTask(){
   const name=document.getElementById('mt-n').value.trim();
   if(!name){toast('Entrez un nom','e');return;}
@@ -1816,6 +1894,21 @@ function saveTask(){
     if(existing&&!canEditTask(existing)){
       toast('🔒 Vous ne pouvez pas modifier cette tâche','e');
       closeModal('moTask');return;
+    }
+  }
+  // Validation employé : pôle et assignees
+  const isAdmin2=CU&&(CU.role==='admin'||CU.role==='manager');
+  if(!isAdmin2&&CU){
+    const selectedPoleCheck=getSelectedPole();
+    if(selectedPoleCheck&&selectedPoleCheck!==CU.pole){
+      toast('🔒 Vous ne pouvez créer des tâches que pour votre pôle ('+
+        (POLES.find(p=>p.id===CU.pole)?.label||CU.pole)+')','e');
+      return;
+    }
+    const selectedUsersCheck=getSelectedUsers();
+    if(selectedUsersCheck.some(uid=>uid!==CU.id)){
+      toast('🔒 Vous ne pouvez assigner des tâches qu\'à vous-même','e');
+      return;
     }
   }
   const pole=getSelectedPole();
