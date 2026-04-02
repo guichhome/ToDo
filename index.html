@@ -186,7 +186,8 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   animation:mpop .25s ease;
 }
 .login-logo{text-align:center;margin-bottom:24px;}
-.login-logo img{height:60px;width:auto;}
+.login-logo img{height:60px;width:auto;transition:filter var(--tr);}
+[data-theme="dark"] .login-logo img{filter:invert(1) brightness(1.1);}
 .login-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--tx);text-align:center;margin-bottom:6px;}
 .login-sub{font-size:12px;color:var(--tx3);text-align:center;margin-bottom:24px;font-family:'JetBrains Mono',monospace;}
 .user-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px;}
@@ -551,7 +552,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
       <span class="user-name" id="headerName">—</span>
     </div>
     <button class="hbtn" onclick="logout()" title="Changer d'utilisateur / Déconnexion" style="font-size:13px;">🚪</button>
-    <button class="btn sm" onclick="openModal('moSync')">☁ Sync</button>
+    <button class="btn sm" onclick="openModal('moSync')">💾 Sauvegarder</button>
     <button class="btn pri sm" onclick="openNewTask()">+ Tâche</button>
   </div>
 </header>
@@ -814,11 +815,11 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 <!-- Sync -->
 <div class="mo" id="moSync">
   <div class="mbox">
-    <div class="mt">☁ Google Sheets</div>
+    <div class="mt">💾 Sauvegarder</div>
     <div style="background:var(--sf2);border:1px solid var(--bd);border-radius:8px;padding:11px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--tx3);line-height:2;margin-bottom:13px;">URL Apps Script requise — voir guide de configuration</div>
     <div class="fg"><label class="fl">URL Apps Script</label><input type="text" class="fi" id="syncUrl" placeholder="https://script.google.com/macros/s/.../exec"/></div>
     <div class="fg"><label class="fl">Direction</label><select class="fs" id="syncDir"><option value="export">⬆ Exporter tout vers Sheets</option><option value="import">⬇ Importer depuis Sheets</option><option value="both">↕ Bidirectionnel</option></select></div>
-    <div class="ma"><button class="btn" onclick="testSync()">Tester connexion</button><button class="btn" onclick="closeModal('moSync')">Fermer</button><button class="btn pri" onclick="doSync()">Synchroniser</button></div>
+    <div class="ma"><button class="btn" onclick="testSync()">Tester connexion</button><button class="btn" onclick="closeModal('moSync')">Fermer</button><button class="btn pri" onclick="doSync()">💾 Sauvegarder</button></div>
     <div id="syncHelper" style="display:none;margin-top:14px;background:var(--ubg);border:1px solid var(--ub);border-radius:8px;padding:12px;font-size:11px;color:var(--tx2);line-height:1.8;">
       <strong style="color:var(--urgent);">❌ Problème de connexion — Vérifiez :</strong><br>
       1. L'URL se termine bien par <code>/exec</code> (pas <code>/dev</code>)<br>
@@ -872,7 +873,7 @@ const ICOS = ['🪚','🔨','🪵','🔩','📐','🏠','🔧','🪛','🪟','�
 // ── URL Apps Script par défaut ──
 // Modifiez cette valeur une fois pour toutes vos appareils
 // Elle sera utilisée si aucune URL n'est sauvegardée localement
-const DEFAULT_SURL = 'https://script.google.com/macros/s/AKfycby2TvnkaLutywIQailqygixj483lI3ec2reMkl4oDbaQm-TQ4BrthYNIZkC5_Avxruo/exec'; // ← Collez votre URL ici pour la rendre permanente
+const DEFAULT_SURL = ''; // ← Collez votre URL ici pour la rendre permanente
 
 let S = {
   users:[],tasks:[],projects:[],
@@ -897,6 +898,28 @@ function save(){
     tsec:S.tsec,surl:S.surl,theme:S.theme,
     sidebarOpen:S.sidebarOpen,
   }));
+  scheduleAutoSync();
+}
+// Auto-sync : déclenche un export 20s après la dernière modification
+// (debounce pour éviter de spammer l'API à chaque frappe)
+let _autoSyncTimer=null;
+function scheduleAutoSync(){
+  if(!S.surl)return; // Pas d'URL configurée
+  clearTimeout(_autoSyncTimer);
+  _autoSyncTimer=setTimeout(async()=>{
+    try{
+      await expSheets(S.surl);
+      // Mise à jour discrète du dot (pas de toast pour ne pas déranger)
+      document.getElementById('sdot').className='sdot ok';
+      document.getElementById('stxt').textContent='Sauvegardé ✓';
+      setTimeout(()=>{
+        document.getElementById('stxt').textContent='Connecté';
+      },3000);
+    }catch(e){
+      console.warn('Auto-sync échouée:',e);
+      document.getElementById('sdot').className='sdot err';
+    }
+  },20000); // 20 secondes de délai
 }
 function load(){
   try{
@@ -908,14 +931,8 @@ function load(){
       sidebarOpen:d.sidebarOpen!==undefined?d.sidebarOpen:true,
     });
     S.tasks.forEach(t=>t.timerRunning=false);
-    // URL prend DEFAULT_SURL si rien en local
+    // URL : fallback sur DEFAULT_SURL si rien en local
   if(!S.surl&&DEFAULT_SURL) S.surl=DEFAULT_SURL;
-  if(S.surl){
-    const su=document.getElementById('syncUrl');if(su)su.value=S.surl;
-    const as=document.getElementById('adminSurl');if(as)as.value=S.surl;
-    document.getElementById('sdot').className='sdot ok';
-    document.getElementById('stxt').textContent='Connecté';
-  }
   }catch(e){}
   if(!S.users.length)seedDemo();
 }
@@ -1070,13 +1087,15 @@ function initApp(sessionRestore=false){
   // Apply theme
   document.documentElement.setAttribute('data-theme',S.theme);
   document.getElementById('themeBtn').textContent=S.theme==='dark'?'🌙':'☀️';
-  // Restore sync URL in both fields (local ou DEFAULT_SURL)
+  updateFavicon();
+  // Restore sync URL dans les champs visibles
   if(!S.surl&&DEFAULT_SURL) S.surl=DEFAULT_SURL;
   if(S.surl){
-    const su=document.getElementById('syncUrl');if(su)su.value=S.surl;
-    const as=document.getElementById('adminSurl');if(as)as.value=S.surl;
-    document.getElementById('sdot').className='sdot ok';
-    document.getElementById('stxt').textContent='Connecté';
+    const su=document.getElementById('syncUrl');
+    if(su) su.value=S.surl;
+    // adminSurl est rendu dynamiquement dans renderAdmin() — pas encore dans le DOM ici
+    try{document.getElementById('sdot').className='sdot ok';}catch(e){}
+    try{document.getElementById('stxt').textContent='Connecté';}catch(e){}
   }
   // Sauvegarde la session pour survivre aux rafraîchissements
   // Sauvegarde session dans les deux storages
@@ -1352,9 +1371,19 @@ function kanbanDrop(e,status){
     } else if((status==='done'||status==='waiting'||status==='cancelled')&&t.timerRunning){
       stopTimer(t.id);
     }
-    if(status==='done'){t.done=true;}
-    else if(status==='cancelled'){t.done=false;}
-    else{t.done=false;}
+    if(status==='done'){
+      t.done=true;
+      // Archive automatiquement après un court délai (laisse le temps de voir la carte)
+      setTimeout(()=>{
+        t.archived=true;
+        save();renderAll();
+        toast('✅ "'+t.name.slice(0,22)+'" terminée et archivée','s');
+      }, 1500);
+    } else if(status==='cancelled'){
+      t.done=false;
+    } else {
+      t.done=false;
+    }
     save();renderKanban();renderSidebar();
     addNotif('Kanban','Tâche "'+t.name.slice(0,20)+'" → '+STATUSES.find(s=>s.id===status).label,'i');
   }
@@ -1585,7 +1614,14 @@ function archiveTask(id){
 }
 function restoreTask(id){
   const t=S.tasks.find(x=>x.id===id);
-  if(t){t.archived=false;t.deleted=false;save();renderAll();toast('↩ Restaurée','s');}
+  if(t){
+    t.archived=false;
+    t.deleted=false;
+    t.done=false;
+    t.status='todo'; // Remet toujours en "À faire" après restauration
+    save();renderAll();
+    toast('↩ Restaurée — remise en "À faire"','s');
+  }
 }
 function softDeleteTask(id){
   const t=S.tasks.find(x=>x.id===id);
@@ -1614,40 +1650,131 @@ function setArchTab(tab,btn){
 }
 function renderArchive(){
   const el=document.getElementById('archiveContent');
+
   if(S.archTab==='tasks'){
     const tasks=S.tasks.filter(t=>t.archived&&!t.deleted);
-    el.innerHTML=tasks.length?`<div class="tl">${tasks.map(t=>tcard(t,true,true)).join('')}</div>`:'<div class="empty"><div class="ei">📦</div><h3>Aucune tâche archivée</h3></div>';
+    if(!tasks.length){el.innerHTML='<div class="empty"><div class="ei">📦</div><h3>Aucune tâche archivée</h3></div>';return;}
+    // Grouper par pôle
+    let html='';
+    POLES.forEach(pole=>{
+      const pt=tasks.filter(t=>t.pole===pole.id);
+      if(!pt.length)return;
+      html+='<div class="gg">'+
+        '<div class="ggh"><span class="pole-badge pole-'+pole.id+'" style="margin-right:4px;">'+pole.ico+' '+pole.label+'</span>'+
+        '<span style="font-size:11px;color:var(--tx3);font-family:JetBrains Mono,monospace;">('+pt.length+')</span>'+
+        '<div class="bar"></div></div>'+
+        '<div class="tl compact-list">'+pt.map(t=>tcard(t,true,true,true)).join('')+'</div>'+
+      '</div>';
+    });
+    // Tâches sans pôle
+    const nopole=tasks.filter(t=>!t.pole||!POLES.find(p=>p.id===t.pole));
+    if(nopole.length){
+      html+='<div class="gg">'+
+        '<div class="ggh">⬜ Sans pôle<div class="bar"></div></div>'+
+        '<div class="tl compact-list">'+nopole.map(t=>tcard(t,true,true,true)).join('')+'</div>'+
+      '</div>';
+    }
+    el.innerHTML=html;
+
   }else if(S.archTab==='projects'){
     const projs=S.projects.filter(p=>p.archived&&!p.deleted);
-    el.innerHTML=projs.length?`<div class="tl">${projs.map(p=>`
-      <div class="tc">
-        <div class="tck"></div>
-        <div class="tb"><div class="tn">${p.name}</div><div class="tm"><span class="test">${p.client||''}</span></div></div>
-        <div class="ttmr"><div class="tcc">
-          <button class="tbt" onclick="restoreProject('${p.id}')" style="color:var(--ok)" title="Restaurer">↩</button>
-          <button class="tbt del" onclick="hardDeleteProject('${p.id}')">×</button>
-        </div></div>
-      </div>`).join('')}</div>`:'<div class="empty"><div class="ei">📦</div><h3>Aucun projet archivé</h3></div>';
+    if(!projs.length){el.innerHTML='<div class="empty"><div class="ei">📦</div><h3>Aucun projet archivé</h3></div>';return;}
+    // Grouper par pôle
+    let html='';
+    POLES.forEach(pole=>{
+      const pp=projs.filter(p=>p.pole===pole.id);
+      if(!pp.length)return;
+      html+='<div class="gg">'+
+        '<div class="ggh"><span class="pole-badge pole-'+pole.id+'" style="margin-right:4px;">'+pole.ico+' '+pole.label+'</span>'+
+        '<span style="font-size:11px;color:var(--tx3);font-family:JetBrains Mono,monospace;">('+pp.length+')</span>'+
+        '<div class="bar"></div></div>'+
+        '<div class="tl">'+pp.map(p=>
+          '<div class="tc">'+
+            '<div class="tck"></div>'+
+            '<div class="tb">'+
+              '<div class="tn">'+p.name+'</div>'+
+              '<div class="tm">'+
+                '<span class="test">'+( p.client||'' )+'</span>'+
+                (p.dateEnd?'<span class="test" style="opacity:.6;">· Fin prévue: '+p.dateEnd+'</span>':'')+
+              '</div>'+
+            '</div>'+
+            '<div style="display:flex;gap:4px;flex-shrink:0;align-self:center;">'+
+              '<button class="tbt" onclick="restoreProject('+p.id+')" style="color:var(--ok)" title="Restaurer">↩</button>'+
+              '<button class="tbt del" onclick="hardDeleteProject('+p.id+')">×</button>'+
+            '</div>'+
+          '</div>'
+        ).join('')+'</div>'+
+      '</div>';
+    });
+    // Projets sans pôle
+    const nopole=projs.filter(p=>!p.pole||!POLES.find(x=>x.id===p.pole));
+    if(nopole.length){
+      html+='<div class="gg">'+
+        '<div class="ggh">⬜ Sans pôle<div class="bar"></div></div>'+
+        '<div class="tl">'+nopole.map(p=>
+          '<div class="tc">'+
+            '<div class="tck"></div>'+
+            '<div class="tb"><div class="tn">'+p.name+'</div><div class="tm"><span class="test">'+(p.client||'')+'</span></div></div>'+
+            '<div style="display:flex;gap:4px;flex-shrink:0;align-self:center;">'+
+              '<button class="tbt" onclick="restoreProject('+p.id+')" style="color:var(--ok)">↩</button>'+
+              '<button class="tbt del" onclick="hardDeleteProject('+p.id+')">×</button>'+
+            '</div>'+
+          '</div>'
+        ).join('')+'</div>'+
+      '</div>';
+    }
+    el.innerHTML=html;
+
   }else{
-    // Corbeille
+    // ── Corbeille ──
     const dtasks=S.tasks.filter(t=>t.deleted);
     const dprojs=S.projects.filter(p=>p.deleted);
-    if(!dtasks.length&&!dprojs.length){el.innerHTML='<div class="empty"><div class="ei">🗑</div><h3>Corbeille vide</h3><p>Rien n\'a été supprimé définitivement.</p></div>';return;}
-    let html=`<div style="margin-bottom:10px;display:flex;justify-content:flex-end;"><button class="btn danger sm" onclick="emptyTrash()">🗑 Vider la corbeille</button></div>`;
-    if(dprojs.length)html+=`<div class="gg"><div class="ggh">Projets supprimés<div class="bar"></div></div><div class="tl">${dprojs.map(p=>`
-      <div class="tc"><div class="tck"></div>
-      <div class="tb"><div class="tn">${p.name}</div><div class="tm"><span class="badge done-b">SUPPRIMÉ</span></div></div>
-      <div class="ttmr"><div class="tcc">
-        <button class="tbt" onclick="restoreProject('${p.id}')" style="color:var(--ok)" title="Restaurer">↩</button>
-        <button class="tbt del" onclick="hardDeleteProject('${p.id}')">×</button>
-      </div></div></div>`).join('')}</div></div>`;
-    if(dtasks.length)html+=`<div class="gg"><div class="ggh">Tâches supprimées<div class="bar"></div></div><div class="tl">${dtasks.map(t=>`
-      <div class="tc"><div class="tck"></div>
-      <div class="tb"><div class="tn">${t.name}</div><div class="tm"><span class="badge done-b">SUPPRIMÉ</span></div></div>
-      <div class="ttmr"><div class="tcc">
-        <button class="tbt" onclick="restoreTask('${t.id}')" style="color:var(--ok)" title="Restaurer">↩</button>
-        <button class="tbt del" onclick="hardDeleteTask('${t.id}')">×</button>
-      </div></div></div>`).join('')}</div></div>`;
+    if(!dtasks.length&&!dprojs.length){
+      el.innerHTML='<div class="empty"><div class="ei">🗑</div><h3>Corbeille vide</h3><p>Rien n\'a été supprimé définitivement.</p></div>';
+      return;
+    }
+    let html='<div style="margin-bottom:10px;display:flex;justify-content:flex-end;">'+
+      '<button class="btn danger sm" onclick="emptyTrash()">🗑 Vider la corbeille</button></div>';
+
+    // Projets supprimés par pôle
+    if(dprojs.length){
+      html+='<div class="gg"><div class="ggh">Projets supprimés<div class="bar"></div></div>';
+      POLES.forEach(pole=>{
+        const pp=dprojs.filter(p=>p.pole===pole.id);
+        if(!pp.length)return;
+        html+='<div style="margin-left:8px;margin-bottom:6px;">'+
+          '<div style="font-size:11px;color:var(--tx3);margin-bottom:4px;">'+pole.ico+' '+pole.label+'</div>'+
+          '<div class="tl">'+pp.map(p=>
+            '<div class="tc"><div class="tck"></div>'+
+            '<div class="tb"><div class="tn">'+p.name+'</div><div class="tm"><span class="badge done-b">SUPPRIMÉ</span></div></div>'+
+            '<div style="display:flex;gap:4px;flex-shrink:0;align-self:center;">'+
+              '<button class="tbt" onclick="restoreProject('+p.id+')" style="color:var(--ok)">↩</button>'+
+              '<button class="tbt del" onclick="hardDeleteProject('+p.id+')">×</button>'+
+            '</div></div>'
+          ).join('')+'</div></div>';
+      });
+      html+='</div>';
+    }
+
+    // Tâches supprimées par pôle
+    if(dtasks.length){
+      html+='<div class="gg"><div class="ggh">Tâches supprimées<div class="bar"></div></div>';
+      POLES.forEach(pole=>{
+        const pt=dtasks.filter(t=>t.pole===pole.id);
+        if(!pt.length)return;
+        html+='<div style="margin-left:8px;margin-bottom:6px;">'+
+          '<div style="font-size:11px;color:var(--tx3);margin-bottom:4px;">'+pole.ico+' '+pole.label+'</div>'+
+          '<div class="tl">'+pt.map(t=>
+            '<div class="tc"><div class="tck"></div>'+
+            '<div class="tb"><div class="tn">'+t.name+'</div><div class="tm"><span class="badge done-b">SUPPRIMÉ</span></div></div>'+
+            '<div style="display:flex;gap:4px;flex-shrink:0;align-self:center;">'+
+              '<button class="tbt" onclick="restoreTask('+t.id+')" style="color:var(--ok)">↩</button>'+
+              '<button class="tbt del" onclick="hardDeleteTask('+t.id+')">×</button>'+
+            '</div></div>'
+          ).join('')+'</div></div>';
+      });
+      html+='</div>';
+    }
     el.innerHTML=html;
   }
 }
@@ -1822,7 +1949,7 @@ function renderAdmin(){
       <div class="admin-card-hd"><div class="admin-card-title">📊 Export des données</div></div>
       <div class="admin-card-body" style="display:flex;flex-direction:column;gap:8px;">
         <button class="btn sm" onclick="exportCSV()">⬇ Export CSV complet</button>
-        <button class="btn sm" onclick="openModal('moSync')">☁ Synchroniser Sheets</button>
+        <button class="btn sm" onclick="openModal('moSync')">💾 Sauvegarder</button>
         <button class="btn sm danger" onclick="if(confirm('Réinitialiser toutes les données ?')){localStorage.removeItem('gh_erp');location.reload();}">⚠ Réinitialiser (demo)</button>
       </div>
     </div>
@@ -2182,8 +2309,8 @@ async function doSync(){
   if(dir==='import'||dir==='both')await impSheets(url);
   closeModal('moSync');
 }
-async function expSheets(url){
-  toast('Export en cours... (peut prendre 10-15s)','i');
+async function expSheets(url, silent=false){
+  if(!silent) toast('Export en cours... (peut prendre 10-15s)','i');
   try{
     const payload=JSON.stringify({
       action:'sync',
@@ -2200,7 +2327,7 @@ async function expSheets(url){
       body:payload
     });
     // Avec no-cors on ne peut pas lire la réponse, mais si on arrive ici c'est OK
-    toast('✓ Données envoyées vers Sheets ! Vérifiez votre Sheet.','s');
+    if(!silent) toast('✓ Données envoyées vers Sheets ! Vérifiez votre Sheet.','s');
     addNotif('Sync Sheets','Export réussi — données envoyées','s');
   }catch(e){
     console.error('expSheets error:',e);
@@ -2239,7 +2366,31 @@ function exportCSV(){
 }
 
 // ── UI HELPERS ──
-function toggleTheme(){S.theme=S.theme==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',S.theme);document.getElementById('themeBtn').textContent=S.theme==='dark'?'🌙':'☀️';document.getElementById('mc').setAttribute('content',S.theme==='dark'?'#0A0806':'#F5EFE6');save();}
+function toggleTheme(){
+  S.theme=S.theme==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',S.theme);
+  document.getElementById('themeBtn').textContent=S.theme==='dark'?'🌙':'☀️';
+  try{document.getElementById('mc').setAttribute('content',S.theme==='dark'?'#0A0806':'#F2EDE4');}catch(e){}
+  updateFavicon();
+  save();
+}
+function updateFavicon(){
+  try{
+    const link=document.querySelector('link[rel="icon"]');
+    if(!link)return;
+    const img=new Image();
+    img.crossOrigin='anonymous';
+    img.onload=function(){
+      const c=document.createElement('canvas');
+      c.width=img.naturalWidth||64;c.height=img.naturalHeight||64;
+      const ctx=c.getContext('2d');
+      if(S.theme==='dark'){ctx.filter='invert(1) brightness(1.1)';}
+      ctx.drawImage(img,0,0);
+      try{link.href=c.toDataURL('image/png');}catch(e){}
+    };
+    img.src=link.href;
+  }catch(e){}
+}
 function toggleSidebar(){S.sidebarOpen=!S.sidebarOpen;document.getElementById('app').classList.toggle('sidebar-open',S.sidebarOpen);save();}
 function toast(msg,type){const e=document.getElementById('toast');e.textContent=msg;e.className='toast '+type+' show';clearTimeout(window._tt);window._tt=setTimeout(()=>e.classList.remove('show'),3200);}
 
@@ -2317,6 +2468,7 @@ renderColorPicker(AVATAR_COLORS[0]);
   }
 
   renderLogin(); // Aucune session valide → écran de connexion
+  updateFavicon();
 })();
 
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
