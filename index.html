@@ -1242,8 +1242,11 @@ function renderKanban(){
   board.innerHTML=STATUSES.map(st=>{
     let tasks=S.tasks.filter(t=>t.status===st.id&&!t.archived&&!t.deleted);
     if(!isAdmin){
-      // Employé : uniquement ses tâches
-      tasks=tasks.filter(t=>t.assignees&&t.assignees.includes(CU.id));
+      // Employé : tâches assignées OU créées par cet utilisateur
+      tasks=tasks.filter(t=>
+        (t.assignees&&t.assignees.includes(CU.id))||
+        (t.createdBy&&t.createdBy===CU.id)
+      );
     }else{
       // Admin : filtre par utilisateurs si sélection active
       if(selCount>0){
@@ -1397,7 +1400,13 @@ function setGF(f,b){S.gf=f;document.querySelectorAll('#pg-all .tfs .tfb').forEac
 // ── MY TASKS ──
 function renderMyTasks(){
   if(!CU)return;
-  const tasks=S.tasks.filter(t=>!t.archived&&!t.deleted&&t.assignees&&t.assignees.includes(CU.id));
+  // Affiche les tâches assignées OU créées par cet utilisateur
+  const tasks=S.tasks.filter(t=>
+    !t.archived&&!t.deleted&&(
+      (t.assignees&&t.assignees.includes(CU.id))||
+      (t.createdBy&&t.createdBy===CU.id)
+    )
+  );
   document.getElementById('my-sub').textContent=tasks.filter(t=>!t.done).length+' tâche(s) assignée(s) à '+CU.name.split(' ')[0];
   const active=tasks.filter(t=>!t.done).sort((a,b)=>a.priority==='urgent'?-1:1);
   const done=tasks.filter(t=>t.done);
@@ -1883,7 +1892,8 @@ function renderUserPicker(selectedIds){
 function toggleUserSel(id,el){el.classList.toggle('sel');}
 function getSelectedUsers(){
   const isAdmin=CU&&(CU.role==='admin'||CU.role==='manager');
-  if(!isAdmin&&CU) return [CU.id]; // Employé : toujours lui-même
+  if(!isAdmin&&CU&&CU.id) return [CU.id]; // Employé : toujours lui-même
+  if(!isAdmin&&CU&&!CU.id){console.warn('[getSelectedUsers] CU.id is undefined!',CU);return [];}
   // Admin: lire les data-uid de chaque chip sélectionné (plus fiable que l'index)
   return [...document.querySelectorAll('#userPicker .user-sel-chip.sel')]
     .map(el=>el.dataset.uid)
@@ -1921,13 +1931,15 @@ function saveTask(){
   const assignees=getSelectedUsers();
   if(editId){
     const t=S.tasks.find(x=>x.id===editId);
-    if(t){Object.assign(t,{name,project:document.getElementById('mt-proj').value,priority:document.getElementById('mt-prio').value,pole,assignees,estimate:parseInt(document.getElementById('mt-est').value)||0,notes:document.getElementById('mt-notes').value.trim(),dateStart:document.getElementById('mt-dstart').value,dateEnd:document.getElementById('mt-dend').value});}
+    if(t){Object.assign(t,{name,project:document.getElementById('mt-proj').value,priority:document.getElementById('mt-prio').value,pole,assignees:Array.isArray(assignees)?assignees:[],estimate:parseInt(document.getElementById('mt-est').value)||0,notes:document.getElementById('mt-notes').value.trim(),dateStart:document.getElementById('mt-dstart').value,dateEnd:document.getElementById('mt-dend').value});}
     toast('✓ Tâche mise à jour','s');
   }else{
-    S.tasks.unshift({id:'t'+Date.now(),name,project:document.getElementById('mt-proj').value,priority:document.getElementById('mt-prio').value,pole,assignees,estimate:parseInt(document.getElementById('mt-est').value)||0,notes:document.getElementById('mt-notes').value.trim(),dateStart:document.getElementById('mt-dstart').value,dateEnd:document.getElementById('mt-dend').value,elapsed:0,timerRunning:false,done:false,archived:false,deleted:false,status:'todo',createdAt:Date.now(),createdBy:CU?CU.id:''});
-    // Notify assignees
+    const newTask={id:'t'+Date.now(),name,project:document.getElementById('mt-proj').value,priority:document.getElementById('mt-prio').value,pole,assignees,estimate:parseInt(document.getElementById('mt-est').value)||0,notes:document.getElementById('mt-notes').value.trim(),dateStart:document.getElementById('mt-dstart').value,dateEnd:document.getElementById('mt-dend').value,elapsed:0,timerRunning:false,done:false,archived:false,deleted:false,status:'todo',createdAt:Date.now(),createdBy:CU?CU.id:''};
+    S.tasks.unshift(newTask);
+    // Debug log
+    console.log('[saveTask] Task created:',{name:newTask.name,assignees:newTask.assignees,pole:newTask.pole,CU_id:CU?CU.id:'null'});
     if(assignees.length)addNotif('Nouvelle tâche','Vous avez été assigné à "'+name+'"','i');
-    toast('✓ Tâche créée','s');
+    toast('✓ Tâche "'+name+'" créée — assignée à '+assignees.length+' pers.','s');
   }
   save();renderAll();closeModal('moTask');
 }
