@@ -1616,6 +1616,11 @@ function renderStats(){
   const done=tasks.filter(t=>t.done);
   const grid=document.getElementById('statsGrid');
 
+  // Variables globales manquantes dans la réécriture
+  let totalSec = 0;
+  tasks.forEach(t => { totalSec += (t.elapsed||0); });
+  S.tasks.forEach(t => { if(t.timerRunning&&t.timerStart) totalSec += Math.floor((Date.now()-t.timerStart)/1000); });
+
   // ── Project progress chart ──
   const activeProjs=S.projects.filter(p=>!p.archived&&!p.deleted);
   let projRows='';
