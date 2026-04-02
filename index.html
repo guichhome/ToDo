@@ -1104,7 +1104,72 @@ function initApp(sessionRestore=false){
   localStorage.setItem('gh_session', sessData);   // fallback PWA
   renderAll();
   goPage('dashboard');
-  if(!sessionRestore)addNotif('Connexion réussie','Bienvenue '+CU.name.split(' ')[0]+' !','i');
+  if(!sessionRestore){
+    addNotif('Connexion réussie','Bienvenue '+CU.name.split(' ')[0]+' !','i');
+  }
+  // ── Import automatique au démarrage ──
+  // Synchronise depuis Sheets pour avoir les données les plus récentes
+  if(S.surl){
+    setTimeout(()=>autoImportOnStart(), 1500); // délai pour laisser le dashboard s'afficher
+  }
+}
+
+async function autoImportOnStart(){
+  try{
+    // Indique que la sync est en cours
+    document.getElementById('sdot').className='sdot ok';
+    document.getElementById('stxt').textContent='Sync...';
+
+    const r = await fetch(S.surl+'?action=load');
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+    if(!d.success) throw new Error(d.error||'Erreur inconnue');
+
+    // Fusion intelligente : les données Sheets écrasent le local
+    // (Sheets = source de vérité partagée)
+    let updated = false;
+
+    // Projets : ajoute ou met à jour
+    (d.projects||[]).forEach(p=>{
+      const existing = S.projects.findIndex(x=>x.id===p.id);
+      if(existing>=0){
+        // Met à jour si la version Sheets est différente
+        Object.assign(S.projects[existing], p);
+      } else {
+        S.projects.push(p);
+        updated = true;
+      }
+    });
+
+    // Tâches : ajoute ou met à jour
+    (d.tasks||[]).forEach(t=>{
+      const existing = S.tasks.findIndex(x=>x.id===t.id);
+      if(existing>=0){
+        // Garde le elapsed local si plus grand (timer local peut avoir avancé)
+        const localElapsed = S.tasks[existing].elapsed||0;
+        Object.assign(S.tasks[existing], t);
+        if(localElapsed > (t.elapsed||0)) S.tasks[existing].elapsed = localElapsed;
+      } else {
+        S.tasks.push(t);
+        updated = true;
+      }
+    });
+
+    if(updated || d.projects?.length || d.tasks?.length){
+      save();
+      renderAll();
+    }
+
+    document.getElementById('sdot').className='sdot ok';
+    document.getElementById('stxt').textContent='Connecté';
+    if(updated) toast('✓ Données synchronisées depuis Sheets','s');
+
+  }catch(e){
+    console.warn('Auto-import au démarrage échoué:',e);
+    document.getElementById('sdot').className='sdot err';
+    document.getElementById('stxt').textContent='Hors ligne';
+    // Pas de toast d'erreur au démarrage pour ne pas déranger
+  }
 }
 
 // ── NAVIGATION ──
