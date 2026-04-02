@@ -536,10 +536,11 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   <div class="h-right">
     <button class="hbtn" onclick="toggleTheme()" id="themeBtn">🌙</button>
     <button class="hbtn" onclick="toggleNotifs()" id="notifBtn" title="Notifications"><span>🔔</span><div class="notif-dot" id="notifDot" style="display:none;"></div></button>
-    <div class="user-badge" onclick="openModal('moProfile')">
+    <div class="user-badge" onclick="openModal('moProfile')" title="Mon profil">
       <div class="user-avatar" id="headerAvatar" style="background:#D4873A;">?</div>
       <span class="user-name" id="headerName">—</span>
     </div>
+    <button class="hbtn" onclick="logout()" title="Changer d'utilisateur / Déconnexion" style="font-size:13px;">🚪</button>
     <button class="btn sm" onclick="openModal('moSync')">☁ Sync</button>
     <button class="btn pri sm" onclick="openNewTask()">+ Tâche</button>
   </div>
@@ -1023,7 +1024,8 @@ async function logout(){
     await new Promise(r=>setTimeout(r,1200));
   }
   CU=null;pinBuffer='';selectedLoginUser=null;
-  localStorage.removeItem('gh_session'); // Efface la session
+  sessionStorage.removeItem('gh_session'); // Efface session onglet
+  localStorage.removeItem('gh_session');   // Efface session PWA
   document.getElementById('pinSection').style.display='none';
   document.getElementById('loginSub').textContent='Sélectionnez votre profil';
   document.getElementById('app').style.display='none';
@@ -1052,8 +1054,10 @@ function initApp(sessionRestore=false){
     const as=document.getElementById('adminSurl');if(as)as.value=S.surl;
   }
   // Sauvegarde la session pour survivre aux rafraîchissements
-  // Session persistante (survit aux refresh, PWA, onglets restaurés)
-  localStorage.setItem('gh_session', JSON.stringify({uid:CU.id, ts:Date.now()}));
+  // Sauvegarde session dans les deux storages
+  const sessData = JSON.stringify({uid:CU.id, ts:Date.now()});
+  sessionStorage.setItem('gh_session', sessData); // onglet actif
+  localStorage.setItem('gh_session', sessData);   // fallback PWA
   renderAll();
   goPage('dashboard');
   if(!sessionRestore)addNotif('Connexion réussie','Bienvenue '+CU.name.split(' ')[0]+' !','i');
@@ -2170,6 +2174,15 @@ document.querySelectorAll('.mo').forEach(o=>o.addEventListener('click',e=>{if(e.
 document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.mo').forEach(o=>o.classList.remove('open'));if((e.ctrlKey||e.metaKey)&&e.key==='n'){e.preventDefault();if(CU)openNewTask();}  });
 
 // ── INIT ──
+// Nettoyer les anciennes sessions au démarrage (version bump)
+const APP_VERSION = '3.1';
+const savedVersion = localStorage.getItem('gh_version');
+if(savedVersion !== APP_VERSION){
+  localStorage.removeItem('gh_session');
+  sessionStorage.removeItem('gh_session');
+  localStorage.setItem('gh_version', APP_VERSION);
+}
+
 load();
 document.documentElement.setAttribute('data-theme',S.theme);
 document.getElementById('themeBtn').textContent=S.theme==='dark'?'🌙':'☀️';
@@ -2178,29 +2191,58 @@ populatePoleSelect('mp-pole');
 populatePoleSelect('mu-pole');
 renderColorPicker(AVATAR_COLORS[0]);
 
-// ── Restauration de session (localStorage, timeout 8h) ──
+// ── Restauration de session ──
+// sessionStorage = dure le temps de l'onglet (disparaît à la fermeture)
+// localStorage   = fallback PWA uniquement (8h max)
 (function(){
-  const SESSION_TTL = 8 * 60 * 60 * 1000; // 8 heures
+  const SESSION_TTL = 8 * 60 * 60 * 1000; // 8h max pour PWA
+
+  // 1. Essai sessionStorage en priorité (onglet actif)
   try {
-    const raw = localStorage.getItem('gh_session');
-    if(raw){
-      const sess = JSON.parse(raw);
-      const age  = Date.now() - (sess.ts || 0);
-      if(age < SESSION_TTL){
-        const savedUser = S.users.find(u => u.id === sess.uid);
-        if(savedUser){
-          CU = savedUser;
-          document.getElementById('loginScreen').style.display = 'none';
-          document.getElementById('app').style.display = 'grid';
-          initApp(true); // Session restore, pas de notif Bienvenue
-          return; // ← Ne pas appeler renderLogin()
-        }
+    const rawSess = sessionStorage.getItem('gh_session');
+    if(rawSess){
+      const sess = JSON.parse(rawSess);
+      const savedUser = S.users.find(u => u.id === sess.uid);
+      if(savedUser){
+        CU = savedUser;
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('app').style.display = 'grid';
+        initApp(true);
+        return;
       }
-      // Session expirée ou user introuvable
-      localStorage.removeItem('gh_session');
+      sessionStorage.removeItem('gh_session');
     }
-  } catch(e){ localStorage.removeItem('gh_session'); }
-  renderLogin(); // Aucune session valide
+  } catch(e){ sessionStorage.removeItem('gh_session'); }
+
+  // 2. Fallback localStorage uniquement si PWA standalone (installée)
+  const isPWA = window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+  if(isPWA){
+    try {
+      const rawLocal = localStorage.getItem('gh_session');
+      if(rawLocal){
+        const sess = JSON.parse(rawLocal);
+        const age = Date.now() - (sess.ts || 0);
+        if(age < SESSION_TTL){
+          const savedUser = S.users.find(u => u.id === sess.uid);
+          if(savedUser){
+            CU = savedUser;
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('app').style.display = 'grid';
+            initApp(true);
+            return;
+          }
+        }
+        localStorage.removeItem('gh_session');
+      }
+    } catch(e){ localStorage.removeItem('gh_session'); }
+  } else {
+    // Navigateur normal → on vide toujours la session localStorage
+    // pour forcer le PIN à chaque nouvelle ouverture
+    localStorage.removeItem('gh_session');
+  }
+
+  renderLogin(); // Aucune session valide → écran de connexion
 })();
 
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
