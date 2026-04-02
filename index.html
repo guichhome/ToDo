@@ -1116,59 +1116,64 @@ function initApp(sessionRestore=false){
 
 async function autoImportOnStart(){
   try{
-    // Indique que la sync est en cours
     document.getElementById('sdot').className='sdot ok';
     document.getElementById('stxt').textContent='Sync...';
 
     const r = await fetch(S.surl+'?action=load');
     if(!r.ok) throw new Error('HTTP '+r.status);
     const d = await r.json();
-    if(!d.success) throw new Error(d.error||'Erreur inconnue');
 
-    // Fusion intelligente : les données Sheets écrasent le local
-    // (Sheets = source de vérité partagée)
-    let updated = false;
+    if(!d.success){
+      // Pas encore de backup (premier lancement) → pas d'erreur
+      console.log('Import démarrage:',d.error||'Aucune donnée distante');
+      document.getElementById('sdot').className='sdot ok';
+      document.getElementById('stxt').textContent='Connecté';
+      return;
+    }
 
-    // Projets : ajoute ou met à jour
-    (d.projects||[]).forEach(p=>{
-      const existing = S.projects.findIndex(x=>x.id===p.id);
-      if(existing>=0){
-        // Met à jour si la version Sheets est différente
-        Object.assign(S.projects[existing], p);
-      } else {
-        S.projects.push(p);
-        updated = true;
-      }
-    });
+    // ── Remplacement complet par les données Sheets ──
+    // Sheets est la source de vérité partagée entre tous les appareils
+    let changed = false;
 
-    // Tâches : ajoute ou met à jour
-    (d.tasks||[]).forEach(t=>{
-      const existing = S.tasks.findIndex(x=>x.id===t.id);
-      if(existing>=0){
-        // Garde le elapsed local si plus grand (timer local peut avoir avancé)
-        const localElapsed = S.tasks[existing].elapsed||0;
-        Object.assign(S.tasks[existing], t);
-        if(localElapsed > (t.elapsed||0)) S.tasks[existing].elapsed = localElapsed;
-      } else {
-        S.tasks.push(t);
-        updated = true;
-      }
-    });
+    if(d.projects && d.projects.length){
+      // Fusionne : garde les projets locaux non présents dans Sheets
+      const sheetIds = new Set(d.projects.map(p=>p.id));
+      const localOnly = S.projects.filter(p=>!sheetIds.has(p.id));
+      S.projects = [...d.projects, ...localOnly];
+      changed = true;
+    }
 
-    if(updated || d.projects?.length || d.tasks?.length){
+    if(d.tasks && d.tasks.length){
+      const sheetIds = new Set(d.tasks.map(t=>t.id));
+      const localOnly = S.tasks.filter(t=>!sheetIds.has(t.id));
+      // Pour les tâches communes, garde le elapsed le plus élevé
+      const merged = d.tasks.map(t=>{
+        const local = S.tasks.find(x=>x.id===t.id);
+        if(local && (local.elapsed||0) > (t.elapsed||0)){
+          return {...t, elapsed: local.elapsed};
+        }
+        return t;
+      });
+      S.tasks = [...merged, ...localOnly];
+      changed = true;
+    }
+
+    // Remet les timers à false (sécurité)
+    S.tasks.forEach(t=>{ t.timerRunning=false; t.timerStart=null; });
+
+    if(changed){
       save();
       renderAll();
+      toast('✓ Données à jour depuis Sheets','s');
     }
 
     document.getElementById('sdot').className='sdot ok';
     document.getElementById('stxt').textContent='Connecté';
-    if(updated) toast('✓ Données synchronisées depuis Sheets','s');
 
   }catch(e){
-    console.warn('Auto-import au démarrage échoué:',e);
+    console.warn('Auto-import démarrage échoué:',e.message);
     document.getElementById('sdot').className='sdot err';
     document.getElementById('stxt').textContent='Hors ligne';
-    // Pas de toast d'erreur au démarrage pour ne pas déranger
   }
 }
 
@@ -2381,7 +2386,8 @@ async function expSheets(url, silent=false){
       action:'sync',
       projects:S.projects,
       tasks:S.tasks,
-      users:S.users.map(u=>{const uu={...u};delete uu.pin;return uu;})
+      users:S.users.map(u=>{const uu={...u};delete uu.pin;return uu;}),
+      tsec:S.tsec
     });
     // mode:'no-cors' est nécessaire pour les POST vers Apps Script depuis un site externe
     // La requête passe bien, mais on ne peut pas lire la réponse (réponse "opaque")
