@@ -869,6 +869,11 @@ const AVATAR_COLORS = ['#D4873A','#E05528','#2EAA72','#3B82F6','#8B5CF6','#EC489
 const ICOS = ['🪚','🔨','🪵','🔩','📐','🏠','🔧','🪛','🪟','🚪'];
 
 // ── STATE ──
+// ── URL Apps Script par défaut ──
+// Modifiez cette valeur une fois pour toutes vos appareils
+// Elle sera utilisée si aucune URL n'est sauvegardée localement
+const DEFAULT_SURL = ''; // ← Collez votre URL ici pour la rendre permanente
+
 let S = {
   users:[],tasks:[],projects:[],
   notifications:[],
@@ -877,7 +882,7 @@ let S = {
   ao:false,tsec:0,surl:'',theme:'dark',
   detArchOpen:false,
   sidebarOpen:true,
-  pending:null, // for confirm modal
+  pending:null,
 };
 let CU = null; // current user
 let pinBuffer = '';
@@ -899,11 +904,18 @@ function load(){
     Object.assign(S,{
       users:d.users||[],tasks:d.tasks||[],projects:d.projects||[],
       notifications:d.notifications||[],
-      tsec:d.tsec||0,surl:d.surl||'',theme:d.theme||'dark',
+      tsec:d.tsec||0,surl:d.surl||DEFAULT_SURL||'',theme:d.theme||'dark',
       sidebarOpen:d.sidebarOpen!==undefined?d.sidebarOpen:true,
     });
     S.tasks.forEach(t=>t.timerRunning=false);
-    if(S.surl)document.getElementById('syncUrl').value=S.surl;
+    // URL prend DEFAULT_SURL si rien en local
+  if(!S.surl&&DEFAULT_SURL) S.surl=DEFAULT_SURL;
+  if(S.surl){
+    const su=document.getElementById('syncUrl');if(su)su.value=S.surl;
+    const as=document.getElementById('adminSurl');if(as)as.value=S.surl;
+    document.getElementById('sdot').className='sdot ok';
+    document.getElementById('stxt').textContent='Connecté';
+  }
   }catch(e){}
   if(!S.users.length)seedDemo();
 }
@@ -1058,10 +1070,13 @@ function initApp(sessionRestore=false){
   // Apply theme
   document.documentElement.setAttribute('data-theme',S.theme);
   document.getElementById('themeBtn').textContent=S.theme==='dark'?'🌙':'☀️';
-  // Restore sync URL in both fields
+  // Restore sync URL in both fields (local ou DEFAULT_SURL)
+  if(!S.surl&&DEFAULT_SURL) S.surl=DEFAULT_SURL;
   if(S.surl){
     const su=document.getElementById('syncUrl');if(su)su.value=S.surl;
     const as=document.getElementById('adminSurl');if(as)as.value=S.surl;
+    document.getElementById('sdot').className='sdot ok';
+    document.getElementById('stxt').textContent='Connecté';
   }
   // Sauvegarde la session pour survivre aux rafraîchissements
   // Sauvegarde session dans les deux storages
@@ -1292,31 +1307,32 @@ function renderKanban(){
 }
 function kanbanCard(t){
   const pole=POLES.find(p=>p.id===t.pole);
+  const proj=S.projects.find(p=>p.id===t.project);
   const us=S.users.filter(u=>t.assignees&&t.assignees.includes(u.id));
-  const poleColor=pole?`var(${pole.color})`:'var(--bd2)';
+  const poleColor=pole?'var('+pole.color+')'  :'var(--bd2)';
   const editable=canEditTask(t);
-  return `<div class="kb-card ${editable?'':'kb-readonly'}" id="kbc-${t.id}"
-    draggable="${editable?'true':'false'}"
-    style="--card-color:${poleColor};${!editable?'opacity:.75;cursor:default;':''}"
-    ondragstart="${editable?`kanbanDragStart(event,'${t.id}')`:''}"
-    ondblclick="${editable?`openEditTask('${t.id}')`:''}"
-    title="${!editable?'Lecture seule — vous n\'êtes pas assigné à cette tâche':'Double-clic pour modifier'}">
-    <div class="kc-name">
-      ${t.name}
-      ${!editable?'<span style="float:right;font-size:9px;color:var(--tx4);">👁</span>':''}
-    </div>
-    <div class="kc-meta">
-      ${t.priority==='urgent'?'<span class="badge urg">URGENT</span>':''}
-      ${pole?`<span class="badge pole-badge pole-${pole.id}">${pole.ico} ${pole.label}</span>`:''}
-    </div>
-    <div class="kc-bottom">
-      <div class="kc-user">
-        ${us.map(u=>`<div class="kc-avatar" style="background:${u.color}" title="${u.name}">${u.initials}</div>`).join('')}
-        ${us.length?`<span class="kc-uname">${us[0].name.split(' ')[0]}</span>`:''}
-      </div>
-      ${t.estimate?`<span class="kc-time">⏳${t.estimate}m</span>`:''}
-    </div>
-  </div>`;
+  const dragAttr=editable?'draggable="true"':'draggable="false"';
+  const dragStart=editable?'ondragstart="kanbanDragStart(event,\''+t.id+'\')"':'';
+  const dblClick=editable?'ondblclick="openEditTask(\''+t.id+'\')"':'';
+  const cardStyle='--card-color:'+poleColor+';'+(editable?'':'opacity:.75;cursor:default;');
+  const titleAttr=editable?'Double-clic pour modifier':'Lecture seule';
+
+  return '<div class="kb-card '+(editable?'':'kb-readonly')+'" id="kbc-'+t.id+'" '+
+    dragAttr+' style="'+cardStyle+'" '+dragStart+' '+dblClick+' title="'+titleAttr+'">'+
+    '<div class="kc-name">'+t.name+(editable?'':'<span style="float:right;font-size:9px;color:var(--tx4);">👁</span>')+'</div>'+
+    '<div class="kc-meta">'+
+      (t.priority==='urgent'?'<span class="badge urg">URGENT</span>':'')+
+      (proj?'<span class="badge" style="background:var(--brand-xs);color:var(--brand-d);border:1px solid rgba(212,135,58,.2);font-size:9px;">🏗 '+proj.name.slice(0,16)+'</span>':'')+
+      (pole?'<span class="badge pole-badge pole-'+pole.id+'">'+pole.ico+' '+pole.label+'</span>':'')+
+    '</div>'+
+    '<div class="kc-bottom">'+
+      '<div class="kc-user">'+
+        us.map(u=>'<div class="kc-avatar" style="background:'+u.color+'" title="'+u.name+'">'+u.initials+'</div>').join('')+
+        (us.length?'<span class="kc-uname">'+us[0].name.split(' ')[0]+'</span>':'')+
+      '</div>'+
+      (t.estimate?'<span class="kc-time">⏳'+t.estimate+'m</span>':'')+
+    '</div>'+
+  '</div>';
 }
 let dragTaskId=null;
 function kanbanDragStart(e,id){dragTaskId=id;e.target.classList.add('dragging');e.dataTransfer.effectAllowed='move';}
@@ -1394,7 +1410,7 @@ function renderDetail(){
   else if(S.df==='running')act=act.filter(t=>t.timerRunning);
   act.sort((a,b)=>a.priority==='urgent'?-1:1);
   const show=[...act,...all.filter(t=>t.done&&!t.archived)];
-  document.getElementById('det-tasks').innerHTML=show.length?show.map(t=>tcard(t)).join(''):'<div class="empty"><div class="ei">📋</div><h3>Aucune tâche</h3></div>';
+  document.getElementById('det-tasks').innerHTML=show.length?show.map(t=>tcard(t,false,false)).join(''):'<div class="empty"><div class="ei">📋</div><h3>Aucune tâche</h3></div>';
   const arch=S.tasks.filter(t=>t.project===p.id&&t.archived&&!t.deleted);
   document.getElementById('det-albl').textContent='Archivées ('+arch.length+')';
   document.getElementById('det-arch').innerHTML=arch.map(t=>tcard(t,true)).join('');
@@ -1439,7 +1455,7 @@ function renderMyTasks(){
   document.getElementById('my-sub').textContent=tasks.filter(t=>!t.done).length+' tâche(s) assignée(s) à '+CU.name.split(' ')[0];
   const active=tasks.filter(t=>!t.done).sort((a,b)=>a.priority==='urgent'?-1:1);
   const done=tasks.filter(t=>t.done);
-  document.getElementById('myTasksList').innerHTML=[...active,...done].length?[...active,...done].map(t=>tcard(t,false,false)).join(''):'<div class="empty"><div class="ei">🎯</div><h3>Aucune tâche assignée</h3><p>Vous êtes à jour !</p></div>';
+  document.getElementById('myTasksList').innerHTML=[...active,...done].length?[...active,...done].map(t=>tcard(t,false,true)).join(''):'<div class="empty"><div class="ei">🎯</div><h3>Aucune tâche assignée</h3><p>Vous êtes à jour !</p></div>';
 }
 
 // ── URGENT PAGE ──
@@ -1788,9 +1804,17 @@ function renderAdmin(){
       <div class="admin-card-hd"><div class="admin-card-title">☁ Google Sheets</div></div>
       <div class="admin-card-body">
         <div class="fg"><label class="fl">URL Apps Script</label><input type="text" class="fi" id="adminSurl" value="${S.surl}" placeholder="https://script.google.com/macros/s/.../exec"/></div>
-        <div style="display:flex;gap:6px;margin-top:6px;">
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
           <button class="btn sm" onclick="testSyncAdmin()">Tester</button>
           <button class="btn pri sm" onclick="saveSurl()">Enregistrer URL</button>
+          <button class="btn sm" onclick="copyUrlForCode()" title="Copier l'URL à coller dans le code source">📋 URL permanente</button>
+        </div>
+        <div id="urlCodeHelper" style="display:none;margin-top:10px;background:var(--sf3);border:1px solid var(--bd2);border-radius:7px;padding:10px 12px;font-size:11px;color:var(--tx2);line-height:1.8;">
+          <strong>Pour rendre l'URL permanente sur tous les appareils :</strong><br>
+          1. Ouvrez le fichier <code style="background:var(--sf);padding:1px 5px;border-radius:3px;">index.html</code> dans un éditeur de texte<br>
+          2. Cherchez la ligne <code style="background:var(--sf);padding:1px 5px;border-radius:3px;">const DEFAULT_SURL = '';</code><br>
+          3. Remplacez par : <code id="urlToCopy" style="background:var(--sf);padding:1px 5px;border-radius:3px;word-break:break-all;"></code><br>
+          4. Sauvegardez et re-uploadez sur GitHub
         </div>
       </div>
     </div>
@@ -1827,7 +1851,21 @@ function deleteUser(id){
 function saveSurl(){
   S.surl=document.getElementById('adminSurl').value.trim();save();
   const syncEl=document.getElementById('syncUrl');if(syncEl)syncEl.value=S.surl;
-  toast('URL enregistrée','s');
+  // Update status dot
+  if(S.surl){document.getElementById('sdot').className='sdot ok';document.getElementById('stxt').textContent='Connecté';}
+  toast('URL enregistrée sur cet appareil','s');
+}
+function copyUrlForCode(){
+  const url=document.getElementById('adminSurl').value.trim();
+  if(!url){toast('Entrez d\'abord une URL','e');return;}
+  const helper=document.getElementById('urlCodeHelper');
+  const code=document.getElementById('urlToCopy');
+  if(code) code.textContent="const DEFAULT_SURL = '"+url+"';";
+  if(helper) helper.style.display='block';
+  // Also try to copy to clipboard
+  if(navigator.clipboard) navigator.clipboard.writeText("const DEFAULT_SURL = '"+url+"';")
+    .then(()=>toast('✓ Copié dans le presse-papiers','s'))
+    .catch(()=>{});
 }
 function testSyncAdmin(){
   const url=document.getElementById('adminSurl').value.trim();
