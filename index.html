@@ -2351,20 +2351,20 @@ function testSync(){
     toast('URL invalide — doit finir par /exec','e');return;
   }
   toast('Test de connexion...','i');
-  // GET simple — Apps Script gère le CORS automatiquement pour GET
   fetch(url+'?action=load')
     .then(r=>r.json())
     .then(d=>{
       if(d.success!==false){
-        toast('✓ Connexion réussie !','s');
+        // Affiche combien de données sont dans Sheets
+        const info=d.tasks?(' — '+d.tasks.length+' tâches, '+d.projects.length+' projets dans Sheets'):'';
+        toast('✓ Connexion OK'+info,'s');
       } else {
-        toast('Script accessible mais erreur interne: '+(d.error||'—'),'w');
+        toast('Sheets accessible mais sans données: '+(d.error||'Faites une sauvegarde d\'abord'),'w');
       }
     })
     .catch(err=>{
       console.error('testSync error:',err);
-      toast('❌ Connexion impossible. Vérifiez le guide ci-dessous.','e');
-      // Show helper
+      toast('❌ Connexion impossible. Vérifiez le guide.','e');
       document.getElementById('syncHelper').style.display='block';
     });
 }
@@ -2380,31 +2380,54 @@ async function doSync(){
   closeModal('moSync');
 }
 async function expSheets(url, silent=false){
-  if(!silent) toast('Export en cours... (peut prendre 10-15s)','i');
+  if(!silent) toast('Sauvegarde en cours...','i');
   try{
-    const payload=JSON.stringify({
+    const data={
       action:'sync',
       projects:S.projects,
       tasks:S.tasks,
       users:S.users.map(u=>{const uu={...u};delete uu.pin;return uu;}),
       tsec:S.tsec
-    });
-    // mode:'no-cors' est nécessaire pour les POST vers Apps Script depuis un site externe
-    // La requête passe bien, mais on ne peut pas lire la réponse (réponse "opaque")
-    await fetch(url,{
-      method:'POST',
-      mode:'no-cors',
-      headers:{'Content-Type':'text/plain'},
-      body:payload
-    });
-    // Avec no-cors on ne peut pas lire la réponse, mais si on arrive ici c'est OK
-    if(!silent) toast('✓ Données envoyées vers Sheets ! Vérifiez votre Sheet.','s');
-    addNotif('Sync Sheets','Export réussi — données envoyées','s');
+    };
+    const json=JSON.stringify(data);
+
+    // ── Stratégie : POST classique sans mode no-cors ──
+    // Apps Script supporte le CORS correctement quand déployé "Tout le monde"
+    let r, d;
+    try{
+      r=await fetch(url,{
+        method:'POST',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body:json
+      });
+      d=await r.json();
+    }catch(corsErr){
+      // Fallback : GET avec données encodées (pour les cas où POST est bloqué)
+      console.warn('POST bloqué, tentative GET fallback...',corsErr.message);
+      const encoded=encodeURIComponent(json);
+      // Si trop long pour GET, tronquer (logs seulement)
+      if(encoded.length<8000){
+        r=await fetch(url+'?action=sync&data='+encoded);
+        d=await r.json();
+      }else{
+        throw new Error('Données trop volumineuses pour GET fallback. Vérifiez le déploiement Apps Script.');
+      }
+    }
+
+    if(d&&d.success){
+      if(!silent) toast('✓ Sauvegardé ! ('+((d.stats&&d.stats.tasks)||0)+' tâches)','s');
+      addNotif('Sauvegarde','Export Sheets réussi','s');
+    } else {
+      const msg=(d&&d.error)||'Erreur inconnue';
+      console.error('expSheets error:',msg);
+      if(!silent) toast('Erreur sauvegarde: '+msg,'e');
+    }
   }catch(e){
-    console.error('expSheets error:',e);
-    toast('Erreur export: '+e.message,'e');
+    console.error('expSheets exception:',e.message);
+    if(!silent) toast('Erreur réseau — vérifiez l\'URL Apps Script','e');
   }
 }
+
 async function impSheets(url){
   toast('Import en cours...','i');
   try{
