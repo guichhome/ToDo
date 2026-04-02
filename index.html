@@ -336,6 +336,8 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .tc.done{opacity:.38;}.tc.done .tn{text-decoration:line-through;color:var(--tx3);}
 .tc:hover{background:var(--ch);border-color:var(--bd2);}
 .tc.run{border-left-color:var(--brand);background:var(--brand-xs);border-color:rgba(212,135,58,.3);animation:tp 2.5s infinite;}
+.tc.tc-readonly{opacity:.65;border-left-style:dashed;}
+.tc.tc-readonly:hover{background:var(--sf);border-color:var(--bd);}
 @keyframes tp{0%,100%{border-color:rgba(212,135,58,.3)}50%{border-color:rgba(212,135,58,.65)}}
 .tck{width:20px;height:20px;border:2px solid var(--bd2);border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all var(--tr);}
 .tck:hover{border-color:var(--brand);}.tck.on{background:var(--brand);border-color:var(--brand);}
@@ -1223,7 +1225,7 @@ function renderKanban(){
     // User chips — chip coloré sélectionné = affiché (vide = tous)
     document.getElementById('kanbanUserChips').innerHTML=S.users.map(u=>{
       const active=selCount===0||kanbanSelectedUsers.includes(u.id);
-      return `<div class="kb-user-chip ${active?'sel':''}" onclick="toggleKanbanUser('${u.id}')">
+      return `<div class="kb-user-chip ${active?'sel':''}" data-uid="${u.id}" onclick="toggleKanbanUser('${u.id}')">
         <div class="av" style="background:${u.color}">${u.initials}</div>
         ${u.name.split(' ')[0]}
       </div>`;
@@ -1448,10 +1450,12 @@ function setPoleTab(tab,btn){
 
 // ── PERMISSIONS ──
 function canEditTask(t){
-  if(!CU)return false;
+  if(!CU||!t)return false;
   if(CU.role==='admin'||CU.role==='manager')return true;
-  // Employee: only if creator or assignee
-  return (t.createdBy&&t.createdBy===CU.id)||(t.assignees&&t.assignees.includes(CU.id));
+  // Employé : créateur OU assigné
+  const isCreator = t.createdBy && t.createdBy===CU.id;
+  const isAssignee = Array.isArray(t.assignees) && t.assignees.includes(CU.id);
+  return isCreator||isAssignee;
 }
 function canDeleteTask(t){return canEditTask(t);}
 
@@ -1462,11 +1466,13 @@ function tcard(t,arch,showProj){
   const vs=t.estimate&&t.elapsed>0?(()=>{const d=t.elapsed-t.estimate*60;return `<div class="tvs ${d>0?'over':'under'}" id="vs-${t.id}">${d>0?'+'+fmt(d)+' dépassé':fmt(-d)+' restant'}</div>`;})():`<div class="tvs" id="vs-${t.id}"></div>`;
   const editable=canEditTask(t);
   const isTimerUser=!CU||(t.assignees&&t.assignees.includes(CU.id))||CU.role==='admin'||CU.role==='manager';
-  return `<div class="tc ${t.priority==='urgent'?'urg':''} ${t.done?'done':''} ${t.timerRunning?'run':''}" id="tc-${t.id}">
-    <div class="tck ${t.done?'on':''}" onclick="${editable?`toggleDone('${t.id}')`:''}" style="${editable?'cursor:pointer':'cursor:default;opacity:.5'}" title="${editable?'':'Lecture seule'}"></div>
-    <div class="tb" onclick="${editable?`openEditTask('${t.id}')`:'showTaskReadOnly('+JSON.stringify(t.name)+')'}" style="cursor:pointer;">
-      <div class="tn">${t.name} ${!editable?'<span style="font-size:9px;color:var(--tx4);font-family:JetBrains Mono,monospace;">👁 lecture</span>':''}</div>
-      <div class="tm">
+  const _tbClick=editable?'onclick="openEditTask(\''+t.id+'\')"':'';
+  const _tbStyle=editable?'':'style="cursor:default"';
+
+  return `<div class="tc ${t.priority==='urgent'?'urg':''} ${t.done?'done':''} ${t.timerRunning?'run':''} ${!editable?'tc-readonly':''}" id="tc-${t.id}">
+    <div class="tck ${t.done?'on':''}" onclick="${editable?`toggleDone('${t.id}')`:``}" style="${editable?'':'cursor:not-allowed;opacity:.35;pointer-events:none'}" title="${editable?'Valider':'Lecture seule'}"></div>
+    <div class="tb" ${_tbClick} ${_tbStyle}>
+      <div class="tn">${t.name}${!editable?'<span style="font-size:9px;color:var(--tx3);opacity:.7;margin-left:3px;">👁</span>':''}</div>
         <span class="badge ${t.done?'done-b':t.priority==='urgent'?'urg':'norm'}">${t.priority==='urgent'?'🔴 Urgent':'🟢 Normal'}</span>
         ${pole?`<span class="badge pole-badge pole-${pole.id}">${pole.ico} ${pole.label}</span>`:''}
         ${showProj&&p?`<span class="badge" style="background:var(--brand-xs);color:var(--brand-d);border:1px solid rgba(212,135,58,.22);">🏗 ${p.name.slice(0,15)}</span>`:''}
@@ -1865,6 +1871,7 @@ function renderUserPicker(selectedIds){
   const forcedSelected=!isAdmin&&CU?[CU.id]:selectedIds;
   document.getElementById('userPicker').innerHTML=visibleUsers.map(u=>`
     <div class="user-sel-chip ${forcedSelected.includes(u.id)?'sel':''}"
+      data-uid="${u.id}"
       onclick="${isAdmin?`toggleUserSel('${u.id}',this)`:''}"
       style="${!isAdmin?'cursor:default;':''}"
       title="${!isAdmin?'Vous êtes automatiquement assigné':'Cliquer pour assigner'}">
@@ -1877,12 +1884,10 @@ function toggleUserSel(id,el){el.classList.toggle('sel');}
 function getSelectedUsers(){
   const isAdmin=CU&&(CU.role==='admin'||CU.role==='manager');
   if(!isAdmin&&CU) return [CU.id]; // Employé : toujours lui-même
-  return [...document.querySelectorAll('#userPicker .user-sel-chip.sel')].map((el,_,arr)=>{
-    const idx2=[...document.querySelectorAll('#userPicker .user-sel-chip')].indexOf(el);
-    // find which user corresponds to this chip position
-    const visibleUsers=S.users;
-    return visibleUsers[idx2]?.id;
-  }).filter(Boolean);
+  // Admin: lire les data-uid de chaque chip sélectionné (plus fiable que l'index)
+  return [...document.querySelectorAll('#userPicker .user-sel-chip.sel')]
+    .map(el=>el.dataset.uid)
+    .filter(Boolean);
 }
 function saveTask(){
   const name=document.getElementById('mt-n').value.trim();
@@ -1912,10 +1917,8 @@ function saveTask(){
     }
   }
   const pole=getSelectedPole();
-  const assignees=[...document.querySelectorAll('#userPicker .user-sel-chip.sel')].map(el=>{
-    const idx=[...document.querySelectorAll('#userPicker .user-sel-chip')].indexOf(el);
-    return S.users[idx]?.id;
-  }).filter(Boolean);
+  // TOUJOURS utiliser getSelectedUsers() — gère les restrictions employé
+  const assignees=getSelectedUsers();
   if(editId){
     const t=S.tasks.find(x=>x.id===editId);
     if(t){Object.assign(t,{name,project:document.getElementById('mt-proj').value,priority:document.getElementById('mt-prio').value,pole,assignees,estimate:parseInt(document.getElementById('mt-est').value)||0,notes:document.getElementById('mt-notes').value.trim(),dateStart:document.getElementById('mt-dstart').value,dateEnd:document.getElementById('mt-dend').value});}
