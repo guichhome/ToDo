@@ -903,6 +903,15 @@ let ivs = {}; // timer intervals
 // ── STORAGE ──
 let _saveDebounce = null;
 
+// Export immédiat vers Sheets (pour les actions importantes : créer/modifier/supprimer)
+async function syncNow(){
+  if(!S.surl) return;
+  clearTimeout(_saveDebounce); // Annule le debounce en cours
+  _savePending = true;
+  await expSheets(S.surl, true);
+  _savePending = false;
+}
+
 function save(){
   localStorage.setItem('gh_erp',JSON.stringify({
     users:S.users,tasks:S.tasks,projects:S.projects,
@@ -1573,7 +1582,7 @@ function kanbanDrop(e,status){
     } else {
       t.done=false;
     }
-    save();renderKanban();renderSidebar();
+    save();syncNow();renderKanban();renderSidebar();
     addNotif('Kanban','Tâche "'+t.name.slice(0,20)+'" → '+STATUSES.find(s=>s.id===status).label,'i');
   }
   dragTaskId=null;
@@ -1797,11 +1806,12 @@ function toggleDone(id){
   if(t.timerRunning)stopTimer(id);
   t.done=!t.done;t.status=t.done?'done':'inprogress';
   save();renderAll();toast(t.done?'✓ Validée !':'Réactivée','s');
+  syncNow();
 }
 function archiveTask(id){
   const t=S.tasks.find(x=>x.id===id);if(!t)return;
   if(!canEditTask(t)){toast('🔒 Action non autorisée','w');return;}
-  t.archived=true;save();renderAll();toast('📦 Archivée','i');
+  t.archived=true;save();renderAll();toast('📦 Archivée','i');syncNow();
 }
 function restoreTask(id){
   const t=S.tasks.find(x=>x.id===id);
@@ -1812,6 +1822,7 @@ function restoreTask(id){
     t.status='todo'; // Remet toujours en "À faire" après restauration
     save();renderAll();
     toast('↩ Restaurée — remise en "À faire"','s');
+    syncNow();
   }
 }
 function softDeleteTask(id){
@@ -1821,14 +1832,15 @@ function softDeleteTask(id){
   if(t.timerRunning)stopTimer(id);
   t.deleted=true;t.deletedAt=Date.now();
   save();renderAll();toast('📦 Tâche déplacée en corbeille','w');
+  syncNow();
 }
 function archiveProject(id){
   const p=S.projects.find(x=>x.id===id);
-  if(p){p.archived=true;save();renderAll();toast('📦 Projet archivé','i');}
+  if(p){p.archived=true;save();renderAll();toast('📦 Projet archivé','i');syncNow();}
 }
 function softDeleteProject(id){
   const p=S.projects.find(x=>x.id===id);
-  if(p){p.deleted=true;p.deletedAt=Date.now();save();renderProjects();renderSidebar();toast('📦 Projet déplacé en corbeille','w');}
+  if(p){p.deleted=true;p.deletedAt=Date.now();save();renderProjects();renderSidebar();toast('📦 Projet déplacé en corbeille','w');syncNow();}
 }
 
 // ── ARCHIVES ──
@@ -1967,10 +1979,10 @@ function renderArchive(){
     el.innerHTML=html;
   }
 }
-function restoreProject(id){const p=S.projects.find(x=>x.id===id);if(p){p.archived=false;p.deleted=false;save();renderAll();toast('↩ Projet restauré','s');}}
-function hardDeleteProject(id){S.projects=S.projects.filter(p=>p.id!==id);S.tasks=S.tasks.filter(t=>t.project!==id);save();renderArchive();toast('Projet supprimé définitivement','e');}
-function hardDeleteTask(id){S.tasks=S.tasks.filter(t=>t.id!==id);save();renderArchive();toast('Tâche supprimée définitivement','e');}
-function emptyTrash(){S.tasks=S.tasks.filter(t=>!t.deleted);S.projects=S.projects.filter(p=>!p.deleted);save();renderArchive();toast('Corbeille vidée','e');}
+function restoreProject(id){const p=S.projects.find(x=>x.id===id);if(p){p.archived=false;p.deleted=false;save();renderAll();toast('↩ Projet restauré','s');syncNow();}}
+function hardDeleteProject(id){S.projects=S.projects.filter(p=>p.id!==id);S.tasks=S.tasks.filter(t=>t.project!==id);save();renderArchive();toast('Projet supprimé définitivement','e');syncNow();}
+function hardDeleteTask(id){S.tasks=S.tasks.filter(t=>t.id!==id);save();renderArchive();toast('Tâche supprimée définitivement','e');syncNow();}
+function emptyTrash(){S.tasks=S.tasks.filter(t=>!t.deleted);S.projects=S.projects.filter(p=>!p.deleted);save();renderArchive();toast('Corbeille vidée','e');syncNow();}
 
 // ── STATS ──
 function renderStats(){
@@ -2401,12 +2413,14 @@ function saveTask(){
     toast('✓ Tâche "'+name+'" créée — assignée à '+assignees.length+' pers.','s');
   }
   save();renderAll();closeModal('moTask');
+  syncNow(); // Export immédiat
 }
 function saveProject(){
   const name=document.getElementById('mp-n').value.trim();if(!name){toast('Entrez un nom','e');return;}
   S.projects.push({id:'p'+Date.now(),name,client:document.getElementById('mp-c').value.trim(),pole:document.getElementById('mp-pole').value,dateStart:document.getElementById('mp-ds').value,dateEnd:document.getElementById('mp-de').value,notes:document.getElementById('mp-notes').value.trim(),archived:false,deleted:false,createdAt:Date.now()});
   ['mp-n','mp-c','mp-ds','mp-de','mp-notes'].forEach(id=>document.getElementById(id).value='');
   save();renderAll();closeModal('moProject');toast('✓ Projet créé','s');
+  syncNow();
 }
 function saveUser(){
   const name=document.getElementById('mu-name').value.trim();
