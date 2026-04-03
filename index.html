@@ -902,7 +902,6 @@ let ivs = {}; // timer intervals
 
 // ── STORAGE ──
 let _saveDebounce = null;
-let _savePending  = false; // Bloque silentImport pendant qu'un export est en attente
 
 function save(){
   localStorage.setItem('gh_erp',JSON.stringify({
@@ -912,12 +911,12 @@ function save(){
     sidebarOpen:S.sidebarOpen,
   }));
   if(S.surl){
-    _savePending = true; // Bloque l'import pendant le debounce
+    _savePending = true; // Bloque checkTimestamp pendant l'export
     clearTimeout(_saveDebounce);
     _saveDebounce = setTimeout(async ()=>{
       await expSheets(S.surl, true); // silencieux
-      _savePending = false; // Autorise à nouveau l'import
-    }, 3000);
+      _savePending = false; // Import autorisé à nouveau
+    }, 2000);
   }
 }
 
@@ -1162,35 +1161,38 @@ function initApp(sessionRestore=false){
   }
 }
 
-// ── Sync par timestamp (requêtes légères) ──
+// ── Sync temps réel par timestamp ──
+// Export à chaque action (debounce 2s) + polling léger toutes les 15s
+// Le flag _savePending bloque l'import quand un export local est en cours
+
 let _pollInterval = null;
 let _lastKnownTs  = 0;
+let _savePending  = false; // true pendant les 2s de debounce + durée export
 
 function startPolling(){
   if(_pollInterval) return;
   if(!S.surl) return;
-  console.log('[Sync] Démarré');
-  autoImportOnStart();
+  autoImportOnStart(); // Import complet au démarrage
+  // Polling léger toutes les 15s — lit juste 1 cellule (timestamp)
   _pollInterval = setInterval(checkTimestamp, 15000);
+  console.log('[Sync] Polling démarré');
 }
 
 function stopPolling(){
   if(_pollInterval){ clearInterval(_pollInterval); _pollInterval=null; }
-  console.log('[Sync] Arrêté');
 }
 
 async function checkTimestamp(){
   if(!S.surl||!CU) return;
-  if(_savePending) return; // Un export local est en attente — ne pas écraser
+  if(_savePending) return; // Export local en cours — on n'écrase pas
   try{
     const r = await fetch(S.surl+'?action=timestamp',{cache:'no-store'});
     if(!r.ok) return;
     const d = await r.json();
     if(!d.success||!d.ts) return;
     if(d.ts !== _lastKnownTs){
-      console.log('[Sync] Changement détecté ts:'+d.ts);
       _lastKnownTs = d.ts;
-      await silentImport();
+      await silentImport(); // Un autre appareil a exporté → on importe
     }
   }catch(e){ /* silencieux */ }
 }
@@ -1201,21 +1203,27 @@ async function silentImport(){
     const r = await fetch(S.surl+'?action=load',{cache:'no-store'});
     if(!r.ok) return;
     const d = await r.json();
-    if(!d.success) return;
+    if(!d.success||(!d.projects?.length&&!d.tasks?.length)) return;
+    // Remplacement avec préservation des timers actifs
     S.projects = d.projects||[];
     S.tasks = (d.tasks||[]).map(t=>{
-      const local=S.tasks.find(x=>x.id===t.id);
+      const loc = S.tasks.find(x=>x.id===t.id);
       return {...t,
-        elapsed:Math.max(t.elapsed||0,local?.elapsed||0),
-        timerRunning:local?.timerRunning||false,
-        timerStart:local?.timerStart||null
+        elapsed:     Math.max(t.elapsed||0, loc?.elapsed||0),
+        timerRunning:loc?.timerRunning||false,
+        timerStart:  loc?.timerStart||null
       };
     });
     if(d.tsec!==undefined) S.tsec=d.tsec;
-    save(); renderAll();
-    const nb=S.tasks.filter(t=>!t.done&&!t.archived&&!t.deleted).length;
-    console.log('[Sync] OK:',S.projects.length,'projets,',nb,'tâches');
-    // Pas de toast — sync silencieuse en arrière-plan
+    // Sauvegarde locale sans re-déclencher l'export
+    localStorage.setItem('gh_erp',JSON.stringify({
+      users:S.users,tasks:S.tasks,projects:S.projects,
+      notifications:S.notifications,
+      tsec:S.tsec,surl:S.surl,theme:S.theme,
+      sidebarOpen:S.sidebarOpen,
+    }));
+    renderAll();
+    console.log('[Sync] Import OK:',S.projects.length,'projets,',S.tasks.filter(t=>!t.deleted&&!t.archived&&!t.done).length,'tâches actives');
   }catch(e){ console.warn('[Sync]',e.message); }
 }
 
@@ -1278,14 +1286,15 @@ async function autoImportOnStart(){
 
     const nb = S.tasks.filter(t=>!t.done&&!t.archived&&!t.deleted).length;
     const np = S.projects.filter(p=>!p.archived&&!p.deleted).length;
-    toast('✓ '+np+' projets et '+nb+' tâches importés depuis Sheets','s');
+    // Import silencieux (juste un log console)
+    console.log('[Import] OK:', np, 'projets,', nb, 'tâches');
     console.log('[Import] Succès:', np, 'projets,', nb, 'tâches actives');
 
   }catch(e){
     console.error('[Import] Erreur:', e.message);
     if(dot) dot.className='sdot err';
     if(txt) txt.textContent='Hors ligne';
-    toast('⚠ Import Sheets échoué: '+e.message.slice(0,50),'w');
+    console.warn('[Import] Échec:', e.message);
   }
 }
 function goPage(p){
