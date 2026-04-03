@@ -936,7 +936,29 @@ function load(){
     // URL : fallback sur DEFAULT_SURL si rien en local
   if(!S.surl&&DEFAULT_SURL) S.surl=DEFAULT_SURL;
   }catch(e){}
-  if(!S.users.length)seedDemo();
+  // Ne charge la démo que si aucune URL Sheets n'est configurée
+  // et qu'il n'y a pas d'utilisateurs locaux
+  if(!S.users.length){
+    if(DEFAULT_SURL || S.surl){
+      // Sheets configuré → on crée juste les utilisateurs par défaut sans les données démo
+      // Les données viendront de Sheets au login
+      seedUsersOnly();
+    } else {
+      seedDemo();
+    }
+  }
+}
+function seedUsersOnly(){
+  // Utilisateurs par défaut sans données de démo
+  // Les projets/tâches viendront de Sheets
+  S.users=[
+    {id:'u1',name:'Guillaume (Direction)',initials:'GD',role:'admin',pole:'',color:'#D4873A',pin:'1234'},
+    {id:'u2',name:'Antoine (Atelier)',initials:'AA',role:'employee',pole:'atelier',color:'#E05528',pin:'2222'},
+    {id:'u3',name:'Anouck (Architecture)',initials:'AN',role:'employee',pole:'arch',color:'#8B5CF6',pin:'3333'},
+    {id:'u4',name:'Marie (Compta)',initials:'MC',role:'employee',pole:'compta',color:'#EC4899',pin:'4444'},
+  ];
+  S.projects=[];
+  S.tasks=[];
 }
 function seedDemo(){
   S.users=[
@@ -1135,42 +1157,39 @@ async function autoImportOnStart(){
     const d = await r.json();
 
     if(!d.success || (!d.tasks?.length && !d.projects?.length)){
-      // Sheets vide ou erreur → pas de changement
+      // Sheets vide — on garde le local
       document.getElementById('stxt').textContent='Connecté';
-      console.log('Sheets vide ou pas de données distantes');
+      console.log('Sheets vide — données locales conservées');
       return;
     }
 
-    // ── Merge : Sheets gagne sur le local ──
-    // Les IDs sont la clé — on garde le elapsed local si plus élevé
-    const sheetProjectIds = new Set((d.projects||[]).map(p=>p.id));
-    const sheetTaskIds    = new Set((d.tasks||[]).map(t=>t.id));
-
-    // Projets : priorité Sheets + projets locaux non encore dans Sheets
-    const localOnlyProjects = S.projects.filter(p=>!sheetProjectIds.has(p.id));
-    S.projects = [...(d.projects||[]), ...localOnlyProjects];
-
-    // Tâches : priorité Sheets + garde elapsed local si plus grand + tâches locales non encore sync
-    const mergedTasks = (d.tasks||[]).map(t=>{
+    // ── REMPLACEMENT COMPLET par les données Sheets ──
+    // Sheets = source de vérité. On écrase tout le local.
+    // Seul le elapsed des timers actifs est préservé si plus élevé.
+    S.projects = (d.projects||[]);
+    S.tasks = (d.tasks||[]).map(t=>{
       const local = S.tasks.find(x=>x.id===t.id);
-      return {...t,
+      return {
+        ...t,
         elapsed: Math.max(t.elapsed||0, local?.elapsed||0),
         timerRunning: false,
         timerStart: null
       };
     });
-    const localOnlyTasks = S.tasks.filter(t=>!sheetTaskIds.has(t.id));
-    S.tasks = [...mergedTasks, ...localOnlyTasks];
+
+    // Réinitialise le temps total depuis Sheets
+    if(d.tsec !== undefined) S.tsec = d.tsec;
 
     save();
     renderAll();
 
     document.getElementById('sdot').className='sdot ok';
     document.getElementById('stxt').textContent='Connecté';
-    toast('✓ Données importées depuis Sheets ('+d.tasks.length+' tâches)','s');
+    const nb = S.tasks.filter(t=>!t.done&&!t.archived&&!t.deleted).length;
+    toast('✓ '+S.projects.length+' projets, '+nb+' tâches actives importés','s');
 
   }catch(e){
-    console.warn('Import démarrage échoué:',e.message);
+    console.warn('Import démarrage:', e.message);
     document.getElementById('sdot').className='sdot err';
     document.getElementById('stxt').textContent='Hors ligne';
   }
@@ -2472,12 +2491,16 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '3.1';
+const APP_VERSION = '3.2';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
+  // Nouvelle version : vide tout le cache local pour repartir propre
+  // Les données seront rechargées depuis Sheets au premier login
   localStorage.removeItem('gh_session');
   sessionStorage.removeItem('gh_session');
+  localStorage.removeItem('gh_erp');
   localStorage.setItem('gh_version', APP_VERSION);
+  console.log('Cache vidé — sera rechargé depuis Sheets au login');
 }
 
 load();
