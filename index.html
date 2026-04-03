@@ -823,7 +823,12 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     </div>
     <div class="fg"><label class="fl">URL Apps Script</label><input type="text" class="fi" id="syncUrl" placeholder="https://script.google.com/macros/s/.../exec"/></div>
     <div class="fg"><label class="fl">Direction</label><select class="fs" id="syncDir"><option value="export">⬆ Exporter tout vers Sheets</option><option value="import">⬇ Importer depuis Sheets</option><option value="both">↕ Bidirectionnel</option></select></div>
-    <div class="ma"><button class="btn" onclick="testSync()">Tester connexion</button><button class="btn" onclick="closeModal('moSync')">Fermer</button><button class="btn pri" onclick="doSync()">💾 Sauvegarder</button></div>
+    <div class="ma">
+      <button class="btn" onclick="testSync()">Tester</button>
+      <button class="btn" onclick="manualImport()">⬇ Importer</button>
+      <button class="btn" onclick="closeModal('moSync')">Fermer</button>
+      <button class="btn pri" onclick="doSync()">💾 Sauvegarder</button>
+    </div>
     <div id="syncHelper" style="display:none;margin-top:14px;background:var(--ubg);border:1px solid var(--ub);border-radius:8px;padding:12px;font-size:11px;color:var(--tx2);line-height:1.8;">
       <strong style="color:var(--urgent);">❌ Problème de connexion — Vérifiez :</strong><br>
       1. L'URL se termine bien par <code>/exec</code> (pas <code>/dev</code>)<br>
@@ -1139,35 +1144,53 @@ function initApp(sessionRestore=false){
   if(!sessionRestore){
     addNotif('Connexion réussie','Bienvenue '+CU.name.split(' ')[0]+' !','i');
   }
-  // ── Import automatique au démarrage ──
-  // Synchronise depuis Sheets pour avoir les données les plus récentes
+  // ── Import automatique au démarrage (sans délai) ──
   if(S.surl){
-    setTimeout(()=>autoImportOnStart(), 1500); // délai pour laisser le dashboard s'afficher
+    // On n'attend PAS la fin de l'import pour afficher l'app
+    // mais l'import est lancé immédiatement
+    autoImportOnStart();
   }
 }
 
 async function autoImportOnStart(){
-  if(!S.surl) return;
+  if(!S.surl){ console.log('[Import] Pas d URL Sheets'); return; }
+  console.log('[Import] Démarrage depuis:', S.surl.slice(0,60)+'...');
+
+  // Affiche un indicateur visible pendant l'import
+  const dot = document.getElementById('sdot');
+  const txt = document.getElementById('stxt');
+  if(dot) dot.className='sdot ok';
+  if(txt) txt.textContent='Import...';
+
   try{
-    document.getElementById('sdot').className='sdot ok';
-    document.getElementById('stxt').textContent='Import...';
-
-    const r = await fetch(S.surl+'?action=load');
+    console.log('[Import] Fetch GET...');
+    const r = await fetch(S.surl+'?action=load', {cache:'no-store'});
+    console.log('[Import] Réponse HTTP:', r.status, r.ok);
     if(!r.ok) throw new Error('HTTP '+r.status);
-    const d = await r.json();
 
-    if(!d.success || (!d.tasks?.length && !d.projects?.length)){
-      // Sheets vide — on garde le local
-      document.getElementById('stxt').textContent='Connecté';
-      console.log('Sheets vide — données locales conservées');
+    const d = await r.json();
+    console.log('[Import] Données reçues:', {
+      success: d.success,
+      projects: d.projects?.length||0,
+      tasks: d.tasks?.length||0,
+      error: d.error
+    });
+
+    if(!d.success){
+      console.warn('[Import] Échec:', d.error);
+      if(txt) txt.textContent='Connecté';
       return;
     }
 
-    // ── REMPLACEMENT COMPLET par les données Sheets ──
-    // Sheets = source de vérité. On écrase tout le local.
-    // Seul le elapsed des timers actifs est préservé si plus élevé.
-    S.projects = (d.projects||[]);
-    S.tasks = (d.tasks||[]).map(t=>{
+    if(!d.projects?.length && !d.tasks?.length){
+      console.log('[Import] Sheets vide — données locales conservées');
+      if(txt) txt.textContent='Connecté';
+      return;
+    }
+
+    // ── Remplacement complet ──
+    S.projects = d.projects || [];
+    S.tasks = (d.tasks || []).map(t => {
       const local = S.tasks.find(x=>x.id===t.id);
       return {
         ...t,
@@ -1176,22 +1199,24 @@ async function autoImportOnStart(){
         timerStart: null
       };
     });
-
-    // Réinitialise le temps total depuis Sheets
     if(d.tsec !== undefined) S.tsec = d.tsec;
 
     save();
     renderAll();
 
-    document.getElementById('sdot').className='sdot ok';
-    document.getElementById('stxt').textContent='Connecté';
+    if(dot) dot.className='sdot ok';
+    if(txt) txt.textContent='Connecté';
+
     const nb = S.tasks.filter(t=>!t.done&&!t.archived&&!t.deleted).length;
-    toast('✓ '+S.projects.length+' projets, '+nb+' tâches actives importés','s');
+    const np = S.projects.filter(p=>!p.archived&&!p.deleted).length;
+    toast('✓ '+np+' projets et '+nb+' tâches importés depuis Sheets','s');
+    console.log('[Import] Succès:', np, 'projets,', nb, 'tâches actives');
 
   }catch(e){
-    console.warn('Import démarrage:', e.message);
-    document.getElementById('sdot').className='sdot err';
-    document.getElementById('stxt').textContent='Hors ligne';
+    console.error('[Import] Erreur:', e.message);
+    if(dot) dot.className='sdot err';
+    if(txt) txt.textContent='Hors ligne';
+    toast('⚠ Import Sheets échoué: '+e.message.slice(0,50),'w');
   }
 }
 function goPage(p){
@@ -1560,17 +1585,19 @@ function setGF(f,b){S.gf=f;document.querySelectorAll('#pg-all .tfs .tfb').forEac
 // ── MY TASKS ──
 function renderMyTasks(){
   if(!CU)return;
-  // Affiche les tâches assignées OU créées par cet utilisateur
+  // Mes tâches = uniquement celles où je suis assigné (même pour l'admin)
   const tasks=S.tasks.filter(t=>
-    !t.archived&&!t.deleted&&(
-      (t.assignees&&t.assignees.includes(CU.id))||
-      (t.createdBy&&t.createdBy===CU.id)
-    )
+    !t.archived&&!t.deleted&&
+    t.assignees&&t.assignees.includes(CU.id)
   );
-  document.getElementById('my-sub').textContent=tasks.filter(t=>!t.done).length+' tâche(s) assignée(s) à '+CU.name.split(' ')[0];
   const active=tasks.filter(t=>!t.done).sort((a,b)=>a.priority==='urgent'?-1:1);
   const done=tasks.filter(t=>t.done);
-  document.getElementById('myTasksList').innerHTML=[...active,...done].length?[...active,...done].map(t=>tcard(t,false,true)).join(''):'<div class="empty"><div class="ei">🎯</div><h3>Aucune tâche assignée</h3><p>Vous êtes à jour !</p></div>';
+  document.getElementById('my-sub').textContent=
+    active.length+' tâche(s) active(s) assignée(s) à '+CU.name.split(' ')[0];
+  document.getElementById('myTasksList').innerHTML=
+    [...active,...done].length
+    ?[...active,...done].map(t=>tcard(t,false,true)).join('')
+    :'<div class="empty"><div class="ei">🎯</div><h3>Aucune tâche assignée</h3><p>Toutes vos tâches sont terminées !</p></div>';
 }
 
 // ── URGENT PAGE ──
@@ -2384,6 +2411,10 @@ function testSync(){
       toast('❌ Connexion impossible. Vérifiez le guide.','e');
       document.getElementById('syncHelper').style.display='block';
     });
+}
+async function manualImport(){
+  closeModal('moSync');
+  await autoImportOnStart();
 }
 async function doSync(){
   const url=document.getElementById('syncUrl').value.trim();
