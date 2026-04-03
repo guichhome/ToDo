@@ -1050,20 +1050,28 @@ function checkPin(){
   }
 }
 async function logout(){
-  // ── Export automatique avant déconnexion ──
+  // ── Export vers Sheets avant déconnexion ──
   if(S.surl){
-    const userName = CU ? CU.name.split(' ')[0] : '?';
-    document.getElementById('sdot').className='sdot ok';
-    document.getElementById('stxt').textContent='Sauvegarde...';
-    toast('💾 Sauvegarde avant déconnexion...','i');
+    toast('💾 Sauvegarde en cours...','i');
+    // On attend que le toast soit visible
+    await new Promise(r=>setTimeout(r,300));
     try{
-      await expSheets(S.surl, false);
+      // POST no-cors (envoi des données, réponse non lisible = normal)
+      const payload=JSON.stringify({
+        action:'sync',
+        projects:S.projects,
+        tasks:S.tasks,
+        users:S.users.map(u=>{const uu={...u};delete uu.pin;return uu;}),
+        tsec:S.tsec
+      });
+      await fetch(S.surl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:payload});
+      toast('✓ Sauvegardé — bonne journée !','s');
+      await new Promise(r=>setTimeout(r,1200));
     }catch(e){
-      console.warn('Export logout échoué:',e);
-      toast('⚠ Sauvegarde échouée — données conservées en local','w');
+      console.warn('Export logout:',e.message);
     }
-    await new Promise(r=>setTimeout(r,800));
   }
+  // ── Nettoyage session ──
   CU=null;pinBuffer='';selectedLoginUser=null;
   sessionStorage.removeItem('gh_session');
   localStorage.removeItem('gh_session');
@@ -1117,69 +1125,56 @@ function initApp(sessionRestore=false){
 }
 
 async function autoImportOnStart(){
+  if(!S.surl) return;
   try{
     document.getElementById('sdot').className='sdot ok';
-    document.getElementById('stxt').textContent='Sync...';
+    document.getElementById('stxt').textContent='Import...';
 
     const r = await fetch(S.surl+'?action=load');
     if(!r.ok) throw new Error('HTTP '+r.status);
     const d = await r.json();
 
-    if(!d.success){
-      // Pas encore de backup (premier lancement) → pas d'erreur
-      console.log('Import démarrage:',d.error||'Aucune donnée distante');
-      document.getElementById('sdot').className='sdot ok';
+    if(!d.success || (!d.tasks?.length && !d.projects?.length)){
+      // Sheets vide ou erreur → pas de changement
       document.getElementById('stxt').textContent='Connecté';
+      console.log('Sheets vide ou pas de données distantes');
       return;
     }
 
-    // ── Remplacement complet par les données Sheets ──
-    // Sheets est la source de vérité partagée entre tous les appareils
-    let changed = false;
+    // ── Merge : Sheets gagne sur le local ──
+    // Les IDs sont la clé — on garde le elapsed local si plus élevé
+    const sheetProjectIds = new Set((d.projects||[]).map(p=>p.id));
+    const sheetTaskIds    = new Set((d.tasks||[]).map(t=>t.id));
 
-    if(d.projects && d.projects.length){
-      // Fusionne : garde les projets locaux non présents dans Sheets
-      const sheetIds = new Set(d.projects.map(p=>p.id));
-      const localOnly = S.projects.filter(p=>!sheetIds.has(p.id));
-      S.projects = [...d.projects, ...localOnly];
-      changed = true;
-    }
+    // Projets : priorité Sheets + projets locaux non encore dans Sheets
+    const localOnlyProjects = S.projects.filter(p=>!sheetProjectIds.has(p.id));
+    S.projects = [...(d.projects||[]), ...localOnlyProjects];
 
-    if(d.tasks && d.tasks.length){
-      const sheetIds = new Set(d.tasks.map(t=>t.id));
-      const localOnly = S.tasks.filter(t=>!sheetIds.has(t.id));
-      // Pour les tâches communes, garde le elapsed le plus élevé
-      const merged = d.tasks.map(t=>{
-        const local = S.tasks.find(x=>x.id===t.id);
-        if(local && (local.elapsed||0) > (t.elapsed||0)){
-          return {...t, elapsed: local.elapsed};
-        }
-        return t;
-      });
-      S.tasks = [...merged, ...localOnly];
-      changed = true;
-    }
+    // Tâches : priorité Sheets + garde elapsed local si plus grand + tâches locales non encore sync
+    const mergedTasks = (d.tasks||[]).map(t=>{
+      const local = S.tasks.find(x=>x.id===t.id);
+      return {...t,
+        elapsed: Math.max(t.elapsed||0, local?.elapsed||0),
+        timerRunning: false,
+        timerStart: null
+      };
+    });
+    const localOnlyTasks = S.tasks.filter(t=>!sheetTaskIds.has(t.id));
+    S.tasks = [...mergedTasks, ...localOnlyTasks];
 
-    // Remet les timers à false (sécurité)
-    S.tasks.forEach(t=>{ t.timerRunning=false; t.timerStart=null; });
-
-    if(changed){
-      save();
-      renderAll();
-      toast('✓ Données à jour depuis Sheets','s');
-    }
+    save();
+    renderAll();
 
     document.getElementById('sdot').className='sdot ok';
     document.getElementById('stxt').textContent='Connecté';
+    toast('✓ Données importées depuis Sheets ('+d.tasks.length+' tâches)','s');
 
   }catch(e){
-    console.warn('Auto-import démarrage échoué:',e.message);
+    console.warn('Import démarrage échoué:',e.message);
     document.getElementById('sdot').className='sdot err';
     document.getElementById('stxt').textContent='Hors ligne';
   }
 }
-
-// ── NAVIGATION ──
 function goPage(p){
   S.cur=p;
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('act'));
@@ -2011,7 +2006,7 @@ function renderAdmin(){
         <div id="urlCodeHelper" style="display:none;margin-top:10px;background:var(--sf3);border:1px solid var(--bd2);border-radius:7px;padding:10px 12px;font-size:11px;color:var(--tx2);line-height:1.8;">
           <strong>Pour rendre l'URL permanente sur tous les appareils :</strong><br>
           1. Ouvrez le fichier <code style="background:var(--sf);padding:1px 5px;border-radius:3px;">index.html</code> dans un éditeur de texte<br>
-          2. Cherchez la ligne <code style="background:var(--sf);padding:1px 5px;border-radius:3px;">const DEFAULT_SURL = '';</code><br>
+          2. Cherchez la ligne <code style="background:var(--sf);padding:1px 5px;border-radius:3px;">const DEFAULT_SURL = 'https://script.google.com/macros/s/AKfycbzjFC-HlkxLooObzW5RhRzEnumDnqaS-p0g_wbddg7k_XEWQ_Nw8q2qlJWQjVnJu0mX/exec';</code><br>
           3. Remplacez par : <code id="urlToCopy" style="background:var(--sf);padding:1px 5px;border-radius:3px;word-break:break-all;"></code><br>
           4. Sauvegardez et re-uploadez sur GitHub
         </div>
@@ -2059,10 +2054,10 @@ function copyUrlForCode(){
   if(!url){toast('Entrez d\'abord une URL','e');return;}
   const helper=document.getElementById('urlCodeHelper');
   const code=document.getElementById('urlToCopy');
-  if(code) code.textContent="const DEFAULT_SURL = '"+url+"';";
+  if(code) code.textContent="const DEFAULT_SURL = 'https://script.google.com/macros/s/AKfycbzjFC-HlkxLooObzW5RhRzEnumDnqaS-p0g_wbddg7k_XEWQ_Nw8q2qlJWQjVnJu0mX/exec';";
   if(helper) helper.style.display='block';
   // Also try to copy to clipboard
-  if(navigator.clipboard) navigator.clipboard.writeText("const DEFAULT_SURL = '"+url+"';")
+  if(navigator.clipboard) navigator.clipboard.writeText("const DEFAULT_SURL = 'https://script.google.com/macros/s/AKfycbzjFC-HlkxLooObzW5RhRzEnumDnqaS-p0g_wbddg7k_XEWQ_Nw8q2qlJWQjVnJu0mX/exec';")
     .then(()=>toast('✓ Copié dans le presse-papiers','s'))
     .catch(()=>{});
 }
@@ -2383,7 +2378,8 @@ async function doSync(){
   closeModal('moSync');
 }
 async function expSheets(url, silent=false){
-  if(!silent) toast('Sauvegarde en cours...','i');
+  if(!url){if(!silent)toast('URL Sheets non configurée','e');return;}
+  if(!silent) toast('Sauvegarde vers Sheets...','i');
   try{
     const payload=JSON.stringify({
       action:'sync',
@@ -2392,51 +2388,21 @@ async function expSheets(url, silent=false){
       users:S.users.map(u=>{const uu={...u};delete uu.pin;return uu;}),
       tsec:S.tsec
     });
-
-    // ── Envoi POST no-cors ──
-    // no-cors = data envoyée, réponse non lisible (normal pour Apps Script cross-origin)
-    await fetch(url, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: {'Content-Type': 'text/plain'},
-      body: payload
+    // POST no-cors : Apps Script reçoit les données
+    // La réponse est "opaque" (normal cross-origin) — pas d'erreur
+    await fetch(url,{
+      method:'POST',
+      mode:'no-cors',
+      headers:{'Content-Type':'text/plain'},
+      body:payload
     });
-
-    // ── Vérification via GET (Apps Script retourne bien CORS sur GET) ──
-    // On attend 3s que Apps Script ait fini d'écrire dans le Sheet
-    await new Promise(res => setTimeout(res, 3000));
-    const verify = await fetch(url + '?action=load');
-    const result = await verify.json();
-
-    if(result.success && (result.tasks||[]).length > 0){
-      const nb = (result.tasks||[]).length;
-      if(!silent) toast('✓ Sauvegardé ! ('+nb+' tâches dans Sheets)','s');
-      addNotif('Sauvegarde',''+nb+' tâches synchronisées','s');
-    } else if(result.success){
-      // Sheets vide — POST n'a peut-être pas fonctionné
-      // Tentative fallback : GET avec data encodée (petits volumes)
-      const encoded = encodeURIComponent(payload);
-      if(encoded.length <= 7500){
-        if(!silent) toast('Tentative fallback GET...','w');
-        const fb = await fetch(url + '?action=sync&data=' + encoded);
-        const fbResult = await fb.json();
-        if(fbResult.success){
-          if(!silent) toast('✓ Sauvegardé via fallback !','s');
-        } else {
-          throw new Error('Fallback échoué: ' + (fbResult.error||'—'));
-        }
-      } else {
-        // Données trop volumineuses pour GET → POST no-cors est la seule option
-        // Si Sheets est vide c'est que Apps Script n'a pas reçu le POST
-        if(!silent) toast('⚠ Vérifiez le déploiement Apps Script (voir Admin)','e');
-        console.error('Sheets vide après POST. Apps Script ne reçoit pas le body. Redéployez en "Nouveau déploiement".');
-      }
-    } else {
-      throw new Error(result.error || 'Erreur inconnue');
+    if(!silent){
+      toast('✓ Données envoyées vers Sheets !','s');
+      addNotif('Sauvegarde','Données envoyées vers Sheets','s');
     }
   }catch(e){
-    console.error('expSheets:', e.message);
-    if(!silent) toast('Erreur: '+e.message.slice(0,60),'e');
+    console.error('expSheets:',e.message);
+    if(!silent) toast('Erreur réseau: '+e.message.slice(0,50),'e');
   }
 }
 
