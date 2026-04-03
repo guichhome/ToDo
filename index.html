@@ -906,10 +906,12 @@ let _saveDebounce = null;
 // Export immédiat vers Sheets (pour les actions importantes : créer/modifier/supprimer)
 async function syncNow(){
   if(!S.surl) return;
-  clearTimeout(_saveDebounce); // Annule le debounce en cours
+  clearTimeout(_saveDebounce);
   _savePending = true;
   await expSheets(S.surl, true);
-  _savePending = false;
+  // Garde le verrou 5s supplémentaires le temps que Sheets écrive réellement
+  // (le POST no-cors ne confirme pas quand Apps Script a fini)
+  setTimeout(()=>{ _savePending = false; }, 5000);
 }
 
 function save(){
@@ -923,8 +925,8 @@ function save(){
     _savePending = true; // Bloque checkTimestamp pendant l'export
     clearTimeout(_saveDebounce);
     _saveDebounce = setTimeout(async ()=>{
-      await expSheets(S.surl, true); // silencieux
-      _savePending = false; // Import autorisé à nouveau
+      await expSheets(S.surl, true);
+      setTimeout(()=>{ _savePending = false; }, 5000); // Attend que Sheets écrive
     }, 2000);
   }
 }
@@ -1183,7 +1185,7 @@ function startPolling(){
   if(!S.surl) return;
   autoImportOnStart(); // Import complet au démarrage
   // Polling léger toutes les 15s — lit juste 1 cellule (timestamp)
-  _pollInterval = setInterval(checkTimestamp, 15000);
+  _pollInterval = setInterval(checkTimestamp, 8000);
   console.log('[Sync] Polling démarré');
 }
 
