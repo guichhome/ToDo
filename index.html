@@ -902,6 +902,7 @@ let ivs = {}; // timer intervals
 
 // ── STORAGE ──
 let _saveDebounce = null;
+let _savePending  = false; // Bloque silentImport pendant qu'un export est en attente
 
 function save(){
   localStorage.setItem('gh_erp',JSON.stringify({
@@ -910,12 +911,12 @@ function save(){
     tsec:S.tsec,surl:S.surl,theme:S.theme,
     sidebarOpen:S.sidebarOpen,
   }));
-  // Export automatique vers Sheets 3s après le dernier save()
-  // (debounce : évite de spammer si plusieurs saves rapides)
   if(S.surl){
+    _savePending = true; // Bloque l'import pendant le debounce
     clearTimeout(_saveDebounce);
-    _saveDebounce = setTimeout(()=>{
-      expSheets(S.surl, true); // silencieux
+    _saveDebounce = setTimeout(async ()=>{
+      await expSheets(S.surl, true); // silencieux
+      _savePending = false; // Autorise à nouveau l'import
     }, 3000);
   }
 }
@@ -1180,6 +1181,7 @@ function stopPolling(){
 
 async function checkTimestamp(){
   if(!S.surl||!CU) return;
+  if(_savePending) return; // Un export local est en attente — ne pas écraser
   try{
     const r = await fetch(S.surl+'?action=timestamp',{cache:'no-store'});
     if(!r.ok) return;
@@ -1212,8 +1214,8 @@ async function silentImport(){
     if(d.tsec!==undefined) S.tsec=d.tsec;
     save(); renderAll();
     const nb=S.tasks.filter(t=>!t.done&&!t.archived&&!t.deleted).length;
-    toast('🔄 Données mises à jour ('+nb+' tâches)','i');
     console.log('[Sync] OK:',S.projects.length,'projets,',nb,'tâches');
+    // Pas de toast — sync silencieuse en arrière-plan
   }catch(e){ console.warn('[Sync]',e.message); }
 }
 
