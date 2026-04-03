@@ -901,6 +901,8 @@ let selectedLoginUser = null;
 let ivs = {}; // timer intervals
 
 // ── STORAGE ──
+let _saveDebounce = null;
+
 function save(){
   localStorage.setItem('gh_erp',JSON.stringify({
     users:S.users,tasks:S.tasks,projects:S.projects,
@@ -908,7 +910,14 @@ function save(){
     tsec:S.tsec,surl:S.surl,theme:S.theme,
     sidebarOpen:S.sidebarOpen,
   }));
-  // Sync uniquement à l'ouverture/fermeture de session ou manuellement
+  // Export automatique vers Sheets 3s après le dernier save()
+  // (debounce : évite de spammer si plusieurs saves rapides)
+  if(S.surl){
+    clearTimeout(_saveDebounce);
+    _saveDebounce = setTimeout(()=>{
+      expSheets(S.surl, true); // silencieux
+    }, 3000);
+  }
 }
 
 function scheduleAutoSync(){
