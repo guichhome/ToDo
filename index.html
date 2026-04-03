@@ -743,7 +743,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     <div class="mt" id="moTaskTitle">Nouvelle tâche</div>
     <div id="taskScopeNote" style="display:none;background:var(--brand-xs);border:1px solid rgba(212,135,58,.25);border-radius:6px;padding:8px 12px;font-size:12px;color:var(--tx2);margin-bottom:12px;"></div>
     <input type="hidden" id="editTaskId"/>
-    <div class="fg"><label class="fl">Nom de la tâche *</label><input type="text" class="fi" id="mt-n" placeholder="Ex: Pose des dormants fenêtre salon"/></div>
+    <div class="fg"><label class="fl">Nom de la tâche *</label><input type="text" class="fi" id="mt-n" placeholder="Ex: Pose des dormants fenêtre salon" onkeydown="if(event.key==='Enter')saveTask()"/></div>
     <div class="fr">
       <div class="fg"><label class="fl">Projet</label><select class="fs" id="mt-proj"></select></div>
       <div class="fg"><label class="fl">Priorité</label><select class="fs" id="mt-prio"><option value="normal">🟢 Normal</option><option value="urgent">🔴 Urgent</option></select></div>
@@ -756,7 +756,10 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
       <div class="fg"><label class="fl">Date fin</label><input type="date" class="fi" id="mt-dend"/></div>
     </div>
     <div class="fg"><label class="fl">Notes</label><textarea class="fta" id="mt-notes" placeholder="Informations complémentaires..."></textarea></div>
-    <div class="ma"><button class="btn" onclick="closeModal('moTask')">Annuler</button><button class="btn pri" onclick="saveTask()">Enregistrer</button></div>
+    <div class="ma">
+  <button class="btn" onclick="cancelTask()">Annuler</button>
+  <button class="btn pri" onclick="saveTask()">Enregistrer</button>
+</div>
   </div>
 </div>
 
@@ -1768,13 +1771,13 @@ function tcard(t,arch,showProj,compact){
   let timerBtns='';
   if(isTimerUser&&!t.done){
     timerBtns+=t.timerRunning
-      ?'<button class="tbt stop" onclick="stopTimer(\''+t.id+'\')">⏹</button>'
-      :'<button class="tbt play" onclick="startTimer(\''+t.id+'\')">▶</button>';
-    timerBtns+='<button class="tbt" onclick="resetTimer(\''+t.id+'\')">↺</button>';
+      ?'<button class="tbt stop" onclick="event.stopPropagation();stopTimer(\''+t.id+'\')">⏹</button>'
+      :'<button class="tbt play" onclick="event.stopPropagation();startTimer(\''+t.id+'\')">▶</button>';
+    timerBtns+='<button class="tbt" onclick="event.stopPropagation();resetTimer(\''+t.id+'\')">↺</button>';
   }
-  if(editable&&t.done&&!arch) timerBtns+='<button class="tbt arch" onclick="archiveTask(\''+t.id+'\')">📦</button>';
-  if(arch&&CU&&(CU.role==='admin'||CU.role==='manager')) timerBtns+='<button class="tbt" onclick="restoreTask(\''+t.id+'\')">↩</button>';
-  if(editable) timerBtns+='<button class="tbt del" onclick="softDeleteTask(\''+t.id+'\')">×</button>';
+  if(editable&&t.done&&!arch) timerBtns+='<button class="tbt arch" onclick="event.stopPropagation();archiveTask(\''+t.id+'\')">📦</button>';
+  if(arch&&CU&&(CU.role==='admin'||CU.role==='manager')) timerBtns+='<button class="tbt" onclick="event.stopPropagation();restoreTask(\''+t.id+'\')">↩</button>';
+  if(editable) timerBtns+='<button class="tbt del" onclick="event.stopPropagation();softDeleteTask(\''+t.id+'\')">×</button>';
 
   // Bottom timer row
   const timerRow='<div class="trow">'+
@@ -2221,6 +2224,7 @@ function testSyncAdmin(){
 // ── MODALS ──
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
+function cancelTask(){closeModal('moTask');}
 function openConfirm(title,msg,action){
   document.getElementById('confirmTitle').textContent=title;
   document.getElementById('confirmMsg').textContent=msg;
