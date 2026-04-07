@@ -565,52 +565,6 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   .kpi-grid{grid-template-columns:1fr!important;}
   .trow-right .tbt{width:22px;height:22px;}
 }
-
-/* ══ CLEANUP: Règles définitives pour les cartes tâches ══ */
-/* Écrase toutes les définitions dupliquées précédentes */
-.tl{display:flex!important;flex-direction:column!important;gap:5px!important;flex-wrap:nowrap!important;}
-.tc{
-  display:grid!important;
-  grid-template-columns:22px 1fr!important;
-  gap:10px!important;
-  align-items:start!important;
-  background:var(--sf);
-  border:1px solid var(--bd);
-  border-left:3px solid var(--ok);
-  border-radius:var(--rs);
-  padding:10px 12px;
-  width:100%;
-  box-sizing:border-box;
-}
-.tc.compact{padding:6px 10px!important;gap:7px!important;}
-.tc.urg{border-left-color:var(--urgent)!important;}
-.tc.done{border-left-color:var(--ok)!important;opacity:.75;}
-.tc.run{border-left-color:var(--brand)!important;}
-.tc.tc-readonly{opacity:.65!important;}
-.tb{min-width:0;overflow:hidden;}
-.tn{font-size:13px;font-weight:500;color:var(--tx);margin-bottom:3px;display:block;}
-.tc.done .tn{text-decoration:line-through;color:var(--tx3);}
-.tm{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px;}
-.trow{
-  display:flex!important;
-  align-items:center;
-  justify-content:space-between;
-  margin-top:7px;
-  padding-top:6px;
-  border-top:1px solid var(--bd);
-  gap:8px;
-  flex-wrap:wrap;
-}
-.trow-left{display:flex;align-items:center;gap:6px;}
-.trow-right{display:flex;align-items:center;gap:4px;}
-.ttime{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;color:var(--tx3);}
-.tc.run .ttime{color:var(--brand);}
-.tbt{width:28px;height:28px;border:1px solid var(--bd);background:var(--sf2);border-radius:5px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:all var(--tr);}
-.tbt:hover{background:var(--sf3);border-color:var(--bd2);}
-.tbt.stop{color:var(--urgent);}
-.tbt.play{color:var(--ok);}
-.tbt.del{color:var(--tx4);}
-.tbt.del:hover{color:var(--urgent);border-color:var(--urgent);}
 </style>
 </head>
 <body>
@@ -1027,7 +981,7 @@ function save(){
     clearTimeout(_saveDebounce);
     _saveDebounce = setTimeout(async ()=>{
       await expSheets(S.surl, true);
-      setTimeout(()=>{ _savePending = false; }, 5000); // Attend que Sheets écrive
+      setTimeout(()=>{ _savePending = false; }, 10000); // Attend 10s que Sheets écrive
     }, 2000);
   }
 }
@@ -1773,7 +1727,9 @@ function renderAllTasks(){
   const bp={};tasks.forEach(t=>{const k=t.project||'__';(bp[k]=bp[k]||[]).push(t);});
   el.innerHTML=Object.keys(bp).map(pid=>{
     const p=S.projects.find(x=>x.id===pid);
-    return `<div class="gg"><div class="ggh">${p?p.name:'Sans projet'}<div class="bar"></div></div><div class="tl compact-list">${bp[pid].map(t=>tcard(t,false,true,true)).join('')}</div></div>`;
+    const projName=p?esc(p.name):'Sans projet';
+    const cards=bp[pid].map(t=>tcard(t,false,true,true)).join('');
+    return '<div class="gg"><div class="ggh">'+projName+'<div class="bar"></div></div><div class="tl compact-list">'+cards+'</div></div>';
   }).join('');
 }
 function setGF(f,b){S.gf=f;document.querySelectorAll('#pg-all .tfs .tfb').forEach(x=>x.classList.remove('act'));b.classList.add('act');renderAllTasks();}
@@ -1815,7 +1771,7 @@ function renderPole(poleId){
 }
 function renderPoleTasksTab(poleId){
   const tasks=S.tasks.filter(t=>t.pole===poleId&&!t.archived&&!t.deleted).sort((a,b)=>a.done===b.done?0:(a.done?1:-1));
-  document.getElementById('poleContent').innerHTML=tasks.length?`<div class="tl compact-list">${tasks.map(t=>tcard(t,false,false,true)).join('')}</div>`:'<div class="empty"><div class="ei">📋</div><h3>Aucune tâche</h3></div>';
+  document.getElementById('poleContent').innerHTML=tasks.length?'<div class="tl compact-list">'+tasks.map(t=>tcard(t,false,false,true)).join('')+'</div>':'<div class="empty"><div class="ei">📋</div><h3>Aucune tâche</h3></div>';
 }
 function renderPoleProjectsTab(poleId){
   const projs=S.projects.filter(p=>p.pole===poleId&&!p.archived&&!p.deleted);
@@ -1851,6 +1807,7 @@ function canEditTask(t){
 }
 function canDeleteTask(t){return canEditTask(t);}
 
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function tcard(t,arch,showProj,compact){
   const p=S.projects.find(x=>x.id===t.project);
   const pole=POLES.find(x=>x.id===t.pole);
@@ -1896,13 +1853,13 @@ function tcard(t,arch,showProj,compact){
   return '<div class="tc '+(t.priority==='urgent'?'urg':'')+' '+(t.done?'done':'')+' '+(t.timerRunning?'run':'')+' '+(!editable?'tc-readonly':'')+' '+(compact?'compact':'')+'" id="tc-'+t.id+'">'+
     '<div class="tck '+(t.done?'on':'')+'" onclick="'+(editable?'toggleDone(\''+t.id+'\')':'')+'" style="'+(editable?'':'cursor:not-allowed;opacity:.35;pointer-events:none')+'" title="'+(editable?'Valider':'Lecture seule')+'"></div>'+
     '<div class="tb" '+_tbClick+' '+_tbStyle+'>'+
-      '<div class="tn">'+t.name+(editable?'':'<span style="font-size:9px;color:var(--tx3);opacity:.7;margin-left:3px;">👁</span>')+'</div>'+
+      '<div class="tn">'+esc(t.name)+(editable?'':'<span style="font-size:9px;color:var(--tx3);opacity:.7;margin-left:3px;">👁</span>')+'</div>'+
       '<div class="tm" style="margin-top:4px;">'+
         '<span class="badge '+(t.done?'done-b':t.priority==='urgent'?'urg':'norm')+'">'+(t.priority==='urgent'?'🔴 Urgent':'🟢 Normal')+'</span>'+
         (pole?'<span class="badge pole-badge pole-'+pole.id+'">'+pole.ico+' '+pole.label+'</span>':'')+
         (showProj&&p?'<span class="badge" style="background:var(--brand-xs);color:var(--brand-d);border:1px solid rgba(212,135,58,.22);">🏗 '+p.name.slice(0,18)+'</span>':'')+
         us.map(u=>'<div class="kc-avatar" style="background:'+u.color+';width:18px;height:18px;font-size:8px;" title="'+u.name+'">'+u.initials+'</div>').join('')+
-        (t.notes?'<span class="test" title="'+t.notes+'">📝</span>':'')+
+        (t.notes?'<span class="test" title="'+esc(t.notes)+'">📝</span>':'')+
       '</div>'+
       timerRow+
     '</div>'+
