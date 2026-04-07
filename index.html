@@ -503,15 +503,67 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .pole-commercial{color:var(--commercial);background:var(--commercial-bg);border-color:rgba(46,170,114,.3);}
 
 ::-webkit-scrollbar{width:5px;height:5px;};:-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
+/* ── Tablette ── */
+@media(max-width:1024px){
+  .fr3{grid-template-columns:1fr 1fr;}
+  .admin-grid{grid-template-columns:1fr;}
+  .kanban-board{grid-template-columns:repeat(5,minmax(180px,1fr));}
+  .stat-block{min-width:0;}
+}
+/* ── Mobile ── */
 @media(max-width:700px){
   .app{grid-template-columns:1fr;grid-template-rows:56px 1fr;}
   .app.sidebar-open{grid-template-columns:1fr;}
-  aside{display:none;}.app.sidebar-open aside{display:flex;position:fixed;left:0;top:56px;bottom:0;z-index:80;width:240px;}
-  .kanban-board{grid-template-columns:repeat(5,minmax(160px,1fr));}
-  .fr,.fr3,.admin-grid{grid-template-columns:1fr;}
-  .kpi-grid{grid-template-columns:repeat(2,1fr);}
-  .trow-right .tbt{width:24px;height:24px;font-size:10px;}
+  aside{display:none;}
+  .app.sidebar-open aside{
+    display:flex;position:fixed;left:0;top:56px;bottom:0;
+    z-index:80;width:260px;box-shadow:4px 0 20px rgba(0,0,0,.4);
+  }
+  /* Pages */
+  .page{padding:12px 10px;}
+  #pg-kanban{padding:10px 8px;}
+  /* Grilles */
+  .fr,.fr3,.admin-grid,.kpi-grid,.projGrid,.stat-grid{grid-template-columns:1fr!important;}
+  .fr2{grid-template-columns:1fr!important;}
+  /* Kanban horizontal scroll */
+  .kanban-board{
+    grid-template-columns:repeat(5,240px);
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  /* Tâches compactes */
+  .tc{padding:8px 10px;gap:7px;}
+  .tn{font-size:13px;}
+  .trow{margin-top:5px;padding-top:5px;}
+  .trow-right .tbt{width:26px;height:26px;font-size:11px;}
   .ttime{font-size:12px;}
+  /* Header */
+  .h-logo-text{display:none!important;}
+  .hname{display:none;}
+  .hbtn{width:32px;height:32px;font-size:13px;}
+  /* KPIs 2 colonnes */
+  .kpi-grid{grid-template-columns:repeat(2,1fr)!important;}
+  /* Projets grille */
+  .projGrid{grid-template-columns:1fr!important;}
+  /* Badges masqués sur mobile */
+  .badge.pole-badge{display:none;}
+  /* Modal plein écran */
+  .mbox,.mbox.wide{
+    width:100vw!important;max-width:100vw!important;
+    margin:0;border-radius:0;
+    max-height:100vh;
+    position:fixed;top:0;left:0;right:0;bottom:0;
+    overflow-y:auto;
+  }
+  .mo{align-items:flex-end;}
+  /* Admin */
+  .admin-grid{gap:12px;}
+}
+/* ── Très petit mobile ── */
+@media(max-width:380px){
+  .tc{padding:6px 8px;}
+  .kpi-grid{grid-template-columns:1fr!important;}
+  .trow-right .tbt{width:22px;height:22px;}
 }
 </style>
 </head>
@@ -1217,10 +1269,16 @@ async function silentImport(){
     const r = await fetch(S.surl+'?action=load',{cache:'no-store'});
     if(!r.ok) return;
     const d = await r.json();
-    if(!d.success||(!d.projects?.length&&!d.tasks?.length)) return;
+    // Validation : on n'importe QUE si les données sont cohérentes
+    if(!d.success) return;
+    if(!Array.isArray(d.projects)||!Array.isArray(d.tasks)) return;
+    // Vérification que les tâches ont bien les champs requis
+    const valid = d.tasks.every(t=>t.id&&t.name!==undefined);
+    if(!valid){ console.warn('[Sync] Données invalides ignorées'); return; }
+
     // Remplacement avec préservation des timers actifs
-    S.projects = d.projects||[];
-    S.tasks = (d.tasks||[]).map(t=>{
+    S.projects = d.projects;
+    S.tasks = d.tasks.map(t=>{
       const loc = S.tasks.find(x=>x.id===t.id);
       return {...t,
         elapsed:     Math.max(t.elapsed||0, loc?.elapsed||0),
@@ -1237,7 +1295,7 @@ async function silentImport(){
       sidebarOpen:S.sidebarOpen,
     }));
     renderAll();
-    console.log('[Sync] Import OK:',S.projects.length,'projets,',S.tasks.filter(t=>!t.deleted&&!t.archived&&!t.done).length,'tâches actives');
+    console.log('[Sync] OK:',d.projects.length,'projets,',d.tasks.filter(t=>!t.deleted&&!t.archived&&!t.done).length,'actives');
   }catch(e){ console.warn('[Sync]',e.message); }
 }
 
