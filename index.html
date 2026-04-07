@@ -565,6 +565,52 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   .kpi-grid{grid-template-columns:1fr!important;}
   .trow-right .tbt{width:22px;height:22px;}
 }
+
+/* ══ CLEANUP: Règles définitives pour les cartes tâches ══ */
+/* Écrase toutes les définitions dupliquées précédentes */
+.tl{display:flex!important;flex-direction:column!important;gap:5px!important;flex-wrap:nowrap!important;}
+.tc{
+  display:grid!important;
+  grid-template-columns:22px 1fr!important;
+  gap:10px!important;
+  align-items:start!important;
+  background:var(--sf);
+  border:1px solid var(--bd);
+  border-left:3px solid var(--ok);
+  border-radius:var(--rs);
+  padding:10px 12px;
+  width:100%;
+  box-sizing:border-box;
+}
+.tc.compact{padding:6px 10px!important;gap:7px!important;}
+.tc.urg{border-left-color:var(--urgent)!important;}
+.tc.done{border-left-color:var(--ok)!important;opacity:.75;}
+.tc.run{border-left-color:var(--brand)!important;}
+.tc.tc-readonly{opacity:.65!important;}
+.tb{min-width:0;overflow:hidden;}
+.tn{font-size:13px;font-weight:500;color:var(--tx);margin-bottom:3px;display:block;}
+.tc.done .tn{text-decoration:line-through;color:var(--tx3);}
+.tm{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px;}
+.trow{
+  display:flex!important;
+  align-items:center;
+  justify-content:space-between;
+  margin-top:7px;
+  padding-top:6px;
+  border-top:1px solid var(--bd);
+  gap:8px;
+  flex-wrap:wrap;
+}
+.trow-left{display:flex;align-items:center;gap:6px;}
+.trow-right{display:flex;align-items:center;gap:4px;}
+.ttime{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;color:var(--tx3);}
+.tc.run .ttime{color:var(--brand);}
+.tbt{width:28px;height:28px;border:1px solid var(--bd);background:var(--sf2);border-radius:5px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:all var(--tr);}
+.tbt:hover{background:var(--sf3);border-color:var(--bd2);}
+.tbt.stop{color:var(--urgent);}
+.tbt.play{color:var(--ok);}
+.tbt.del{color:var(--tx4);}
+.tbt.del:hover{color:var(--urgent);border-color:var(--urgent);}
 </style>
 </head>
 <body>
