@@ -1541,10 +1541,10 @@ function renderKanban(){
     // User chips — chip coloré sélectionné = affiché (vide = tous)
     document.getElementById('kanbanUserChips').innerHTML=S.users.map(u=>{
       const active=selCount===0||kanbanSelectedUsers.includes(u.id);
-      return `<div class="kb-user-chip ${active?'sel':''}" data-uid="${u.id}" onclick="toggleKanbanUser('${u.id}')">
-        <div class="av" style="background:${u.color}">${u.initials}</div>
-        ${u.name.split(' ')[0]}
-      </div>`;
+      return '<div class="kb-user-chip '+(active?'sel':'')+'" data-uid="'+u.id+'" onclick="toggleKanbanUser(\'' +u.id+ '\')">'+
+        '<div class="av" style="background:'+u.color+'">'+u.initials+'</div>'+
+        u.name.split(' ')[0]+
+      '</div>';
     }).join('');
   }else{
     adminBar.style.display='none';
@@ -1570,19 +1570,22 @@ function renderKanban(){
       }
       if(pf)tasks=tasks.filter(t=>t.pole===pf);
     }
-    return `<div class="kb-col" id="kbc-${st.id}"
-      ondragover="kanbanDragOver(event,'${st.id}')"
-      ondrop="kanbanDrop(event,'${st.id}')"
-      ondragleave="kanbanDragLeave(event)">
-      <div class="kb-col-hd">
-        <div class="kb-col-title"><div class="kb-col-dot" style="background:${st.color}"></div>${st.label}</div>
-        <span class="kb-count">${tasks.length}</span>
-      </div>
-      <div class="kb-cards" id="kbc-cards-${st.id}">
-        ${tasks.map(t=>kanbanCard(t)).join('')}
-        ${tasks.length===0?'<div style="padding:20px;text-align:center;color:var(--tx4);font-size:12px;">Vide</div>':''}
-      </div>
-    </div>`;
+    const cards=tasks.map(t=>kanbanCard(t)).join('');
+    const empty=tasks.length===0?'<div style="padding:20px;text-align:center;color:var(--tx4);font-size:12px;">Vide</div>':'';
+    const col=
+      '<div class="kb-col" id="kbc-'+st.id+'"'+
+      ' ondragover="kanbanDragOver(event,&apos;'+st.id+'&apos;)"'+
+      ' ondrop="kanbanDrop(event,&apos;'+st.id+'&apos;)"'+
+      ' ondragleave="kanbanDragLeave(event)">'+
+      '<div class="kb-col-hd">'+
+        '<div class="kb-col-title"><div class="kb-col-dot" style="background:'+st.color+'"></div>'+esc(st.label)+'</div>'+
+        '<span class="kb-count">'+tasks.length+'</span>'+
+      '</div>'+
+      '<div class="kb-cards" id="kbc-cards-'+st.id+'">'+
+        cards+empty+
+      '</div>'+
+    '</div>';
+    return col;
   }).join('');
 }
 function kanbanCard(t){
