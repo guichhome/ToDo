@@ -165,7 +165,6 @@ main::-webkit-scrollbar{width:5px;}
 main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .page{display:none;padding:20px 22px;min-height:100%;animation:pgIn .2s ease;}
 .page.act{display:block;}
-#pg-kanban.act{display:flex !important;flex-direction:column;}
 @keyframes pgIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .pgh{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap;}
 .pgt{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--tx);line-height:1.1;}
@@ -240,74 +239,11 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .kpi-lbl{font-size:11px;color:var(--tx3);font-family:'JetBrains Mono',monospace;}
 .kpi-sub{font-size:10px;color:var(--tx4);margin-top:3px;}
 
-/* ═══ KANBAN ═══ */
-.kanban-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;flex-shrink:0;}
 .kf-btn{padding:5px 12px;border:1px solid var(--bd);border-radius:20px;background:transparent;color:var(--tx3);font-size:12px;font-family:'Instrument Sans',sans-serif;font-weight:500;cursor:pointer;transition:all var(--tr);}
 .kf-btn:hover{border-color:var(--bd2);color:var(--tx2);}
 .kf-btn.act{background:var(--brand);border-color:var(--brand);color:#fff;}
 .kf-btn.uf.act{background:var(--urgent);border-color:var(--urgent);}
-.kanban-board{
-  display:grid !important;
-  grid-template-columns:repeat(5,minmax(220px,1fr));
-  grid-auto-rows:1fr;
-  gap:10px;
-  overflow-x:auto;
-  padding-bottom:12px;
-  align-items:stretch;
-  width:100%;
-  min-width:0;
-  /* Hauteur fixe = évite que le contenu des colonnes casse la grille */
-  height:calc(100vh - 180px);
-  min-height:300px;
-}
-.kanban-board::-webkit-scrollbar{height:5px;}
-.kanban-board::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 
-.kb-col{
-  background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);
-  display:flex;flex-direction:column;
-  height:100%;
-  overflow:hidden;
-  min-height:200px;
-}
-.kb-col-hd{
-  padding:10px 12px;border-bottom:1px solid var(--bd);
-  display:flex;align-items:center;justify-content:space-between;
-  flex-shrink:0;
-}
-.kb-col-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--tx2);display:flex;align-items:center;gap:7px;}
-.kb-col-dot{width:8px;height:8px;border-radius:50%;}
-.kb-count{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--tx3);background:var(--sf3);padding:1px 7px;border-radius:10px;}
-.kb-user-chip{
-  display:flex;align-items:center;gap:5px;padding:5px 11px 5px 6px;
-  border-radius:20px;border:2px solid var(--bd2);background:var(--sf2);
-  cursor:pointer;transition:all var(--tr);font-size:12px;font-weight:500;color:var(--tx3);
-  user-select:none;
-}
-.kb-user-chip:hover{border-color:var(--bd2);background:var(--sf3);color:var(--tx2);}
-.kb-user-chip.sel{border-color:var(--brand);background:var(--brand-xs);color:var(--tx);}
-.kb-user-chip .av{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0;}
-.kb-cards{
-  padding:8px;
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-  min-height:60px;
-  flex:1;
-  overflow-y:auto;
-  overflow-x:hidden;
-}
-.kb-cards::-webkit-scrollbar{width:3px;}
-.kb-cards::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
-.kb-card{
-  background:var(--sf2);border:1px solid var(--bd);border-radius:var(--rs);
-  padding:10px 11px;cursor:grab;transition:all var(--tr);
-  border-left:3px solid var(--card-color,var(--bd2));
-}
-.kb-card:hover{background:var(--sf3);border-color:var(--bd2);box-shadow:var(--sh);}
-.kb-card.dragging{opacity:.5;transform:rotate(2deg);cursor:grabbing;}
-.kb-card.drag-over{border-color:var(--brand);background:var(--brand-xs);}
-.kb-col.drag-over-col{border-color:var(--brand);background:rgba(212,135,58,.03);}
 .kc-name{font-size:12px;font-weight:600;color:var(--tx);margin-bottom:5px;line-height:1.3;}
 .kc-meta{display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
 .badge{font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 6px;border-radius:3px;font-weight:500;letter-spacing:.04em;}
@@ -526,8 +462,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 @media(max-width:1024px){
   .fr3{grid-template-columns:1fr 1fr;}
   .admin-grid{grid-template-columns:1fr;}
-  .kanban-board{grid-template-columns:repeat(5,minmax(180px,1fr));}
-  .stat-block{min-width:0;}
+    .stat-block{min-width:0;}
 }
 /* ── Mobile ── */
 @media(max-width:700px){
@@ -540,19 +475,11 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   }
   /* Pages */
   .page{padding:12px 10px;}
-  #pg-kanban{padding:16px 18px;min-height:unset;overflow:hidden;display:none;}
-#pg-kanban{padding:10px 8px;}
-  /* Grilles */
+    /* Grilles */
   .fr,.fr3,.admin-grid,.kpi-grid,.projGrid,.stat-grid{grid-template-columns:1fr!important;}
   .fr2{grid-template-columns:1fr!important;}
   /* Kanban horizontal scroll */
-  .kanban-board{
-    grid-template-columns:repeat(5,220px);
-    overflow-x:auto;
-    -webkit-overflow-scrolling:touch;
-    height:calc(100vh - 140px);
-  }
-  /* Tâches compactes */
+    /* Tâches compactes */
   .tc{padding:8px 10px;gap:7px;}
   .tn{font-size:13px;}
   .trow{margin-top:5px;padding-top:5px;}
@@ -586,6 +513,94 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   .kpi-grid{grid-template-columns:1fr!important;}
   .trow-right .tbt{width:22px;height:22px;}
 }
+
+/* ══════════════════════════════
+   KANBAN — CSS PROPRE
+══════════════════════════════ */
+#pg-kanban{padding:16px 18px;}
+#pg-kanban.act{
+  display:flex !important;
+  flex-direction:column;
+}
+.kanban-filters{
+  display:flex;gap:6px;flex-wrap:wrap;
+  margin-bottom:10px;align-items:center;flex-shrink:0;
+}
+.kanban-board{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(220px,1fr));
+  gap:10px;
+  flex:1;
+  min-height:0;
+  overflow-x:auto;
+  overflow-y:hidden;
+  align-items:start;
+  padding-bottom:8px;
+}
+.kanban-board::-webkit-scrollbar{height:5px;}
+.kanban-board::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
+.kb-col{
+  background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);
+  display:flex;flex-direction:column;
+  min-height:200px;
+  max-height:calc(100vh - 200px);
+  overflow:hidden;
+}
+.kb-col-hd{
+  padding:10px 12px;border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.kb-col-title{
+  font-family:'Syne',sans-serif;font-size:13px;font-weight:700;
+  color:var(--tx2);display:flex;align-items:center;gap:7px;
+}
+.kb-col-dot{width:8px;height:8px;border-radius:50%;}
+.kb-count{
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  color:var(--tx3);background:var(--sf3);padding:1px 7px;border-radius:10px;
+}
+.kb-cards{
+  padding:8px;display:flex;flex-direction:column;gap:6px;
+  overflow-y:auto;overflow-x:hidden;flex:1;
+}
+.kb-cards::-webkit-scrollbar{width:3px;}
+.kb-cards::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
+.kb-card{
+  background:var(--sf2);border:1px solid var(--bd);border-radius:var(--rs);
+  padding:10px 11px;cursor:grab;transition:all var(--tr);
+  border-left:3px solid var(--card-color,var(--bd2));
+  flex-shrink:0;
+}
+.kb-card:hover{background:var(--sf3);border-color:var(--bd2);box-shadow:var(--sh);}
+.kb-card.dragging{opacity:.5;transform:rotate(2deg);cursor:grabbing;}
+.kb-card.drag-over{border-color:var(--brand);background:var(--brand-xs);}
+.kb-card.kb-readonly{opacity:.7;cursor:default;}
+.kb-col.drag-over-col{border-color:var(--brand);background:rgba(212,135,58,.03);}
+.kb-user-chip{
+  display:flex;align-items:center;gap:5px;padding:5px 11px 5px 6px;
+  border-radius:20px;border:2px solid var(--bd2);background:var(--sf2);
+  cursor:pointer;transition:all var(--tr);font-size:12px;font-weight:500;
+  color:var(--tx3);user-select:none;
+}
+.kb-user-chip:hover{background:var(--sf3);color:var(--tx2);}
+.kb-user-chip.sel{border-color:var(--brand);background:var(--brand-xs);color:var(--tx);}
+.kb-user-chip .av{
+  width:20px;height:20px;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;font-size:9px;font-weight:700;
+  color:#fff;flex-shrink:0;
+}
+.kc-name{font-size:13px;font-weight:500;color:var(--tx);margin-bottom:6px;line-height:1.3;}
+.kc-meta{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;}
+.kc-bottom{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+.kc-user{display:flex;align-items:center;gap:3px;}
+.kc-avatar{
+  width:20px;height:20px;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;font-size:8px;
+  font-weight:700;color:#fff;
+}
+.kc-uname{font-size:11px;color:var(--tx3);margin-left:2px;}
+.kc-time{font-size:10px;color:var(--tx3);font-family:'JetBrains Mono',monospace;}
 </style>
 </head>
 <body>
@@ -1540,15 +1555,7 @@ function renderKanban(){
   if(!CU)return;
   if(S.cur!=='kanban')return;
   const isAdmin=CU.role==='admin'||CU.role==='manager';
-  // Hauteur dynamique du board
-  requestAnimationFrame(()=>{
-    const board=document.getElementById('kanbanBoard');
-    if(board){
-      const top=board.getBoundingClientRect().top;
-      const h=window.innerHeight-top-20;
-      if(h>200)board.style.height=h+'px';
-    }
-  });
+
 
   // ── Titre ──
   document.getElementById('kanbanTitle').textContent=isAdmin?'Kanban — Supervision':'Mon Kanban';
