@@ -156,12 +156,12 @@ aside::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .ni[data-pole="atelier"].act{background:rgba(212,135,58,.1);border-color:rgba(212,135,58,.2);color:var(--atelier);}
 .ni[data-pole="commercial"].act{background:rgba(46,170,114,.1);border-color:rgba(46,170,114,.2);color:var(--commercial);}
 
-main{overflow-y:auto;overflow-x:auto;background:var(--bg2);position:relative;height:100%;}
+main{overflow:hidden;background:var(--bg2);position:relative;height:100%;}
 main::-webkit-scrollbar{width:5px;}
 main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .page{display:none;padding:20px 22px;min-height:100%;animation:pgIn .2s ease;}
 #pg-kanban{min-height:0;padding:16px 18px;}
-.page.act{display:block;}
+.page.act{display:block;overflow-y:auto;height:100%;box-sizing:border-box;}
 @keyframes pgIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .pgh{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap;}
 .pgt{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--tx);line-height:1.1;}
