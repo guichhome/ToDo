@@ -156,11 +156,11 @@ aside::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .ni[data-pole="atelier"].act{background:rgba(212,135,58,.1);border-color:rgba(212,135,58,.2);color:var(--atelier);}
 .ni[data-pole="commercial"].act{background:rgba(46,170,114,.1);border-color:rgba(46,170,114,.2);color:var(--commercial);}
 
-main{overflow:hidden;background:var(--bg2);position:relative;}
+main{overflow-y:auto;overflow-x:hidden;background:var(--bg2);}
 main::-webkit-scrollbar{width:5px;}
 main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .page{display:none;padding:20px 22px;min-height:100%;animation:pgIn .2s ease;}
-.page.act{display:block;overflow-y:auto;height:100%;box-sizing:border-box;}
+.page.act{display:block;}
 @keyframes pgIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .pgh{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap;}
 .pgt{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--tx);line-height:1.1;}
@@ -496,54 +496,59 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 /* Colonnes */
 /* Cards scrollables */
 
+
 /* ═══ KANBAN ═══ */
-#pg-kanban{padding:0;}
-#pg-kanban.act{
-  position:absolute;
-  top:0; left:0; right:0; bottom:0;
-  display:flex;
-  flex-direction:column;
-  padding:12px 14px;
-  overflow:hidden;
-  box-sizing:border-box;
-}
-.kanban-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center;flex-shrink:0;}
+#pg-kanban{padding:12px 14px;box-sizing:border-box;}
+#pg-kanban.act{display:flex !important;flex-direction:column;}
+.kanban-header-area{flex-shrink:0;margin-bottom:8px;}
+.kanban-filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+
+/* Le wrapper scrollable a une hauteur CALCULÉE explicite */
 .kanban-scroll{
-  flex:1;
-  min-height:0;
+  height:calc(100vh - 56px - 80px);
+  min-height:200px;
   overflow-x:auto;
   overflow-y:hidden;
   display:flex;
-  flex-direction:column;
+  flex-direction:row;
 }
 .kanban-scroll::-webkit-scrollbar{height:6px;}
 .kanban-scroll::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
+
+/* Board = taille naturelle (pas de width contrainte) */
 .kanban-board{
   display:flex;
   flex-direction:row;
   flex-wrap:nowrap;
   gap:8px;
-  flex:1;
-  min-height:0;
+  height:100%;
+  padding-bottom:6px;
 }
+
+/* Colonnes */
 .kb-col{
   flex:0 0 220px;
   min-width:220px;
+  height:100%;
   display:flex;
   flex-direction:column;
   background:var(--sf);
   border:1px solid var(--bd);
   border-radius:var(--r);
   overflow:hidden;
-  min-height:0;
 }
-.kb-col-hd{padding:10px 12px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.kb-col-hd{
+  padding:10px 12px;border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
 .kb-col-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--tx2);display:flex;align-items:center;gap:7px;}
 .kb-col-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .kb-count{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--tx3);background:var(--sf3);padding:1px 7px;border-radius:10px;}
+
+/* Cards — scroll vertical illimité */
 .kb-cards{
   flex:1;
-  min-height:0;
   overflow-y:auto;
   overflow-x:hidden;
   padding:6px;
@@ -1514,6 +1519,17 @@ function toggleKanbanUser(uid){
 function renderKanban(){
   if(!CU)return;
   if(S.cur!=='kanban')return;
+  // Ajustement dynamique de la hauteur du scroll
+  requestAnimationFrame(()=>{
+    const pg=document.getElementById('pg-kanban');
+    const scroll=document.querySelector('.kanban-scroll');
+    if(pg&&scroll){
+      const pgRect=pg.getBoundingClientRect();
+      const scrollTop=scroll.getBoundingClientRect().top;
+      const h=window.innerHeight-scrollTop-20;
+      if(h>100)scroll.style.height=h+'px';
+    }
+  });
   const isAdmin=CU.role==='admin'||CU.role==='manager';
   document.getElementById('kanbanTitle').textContent='Kanban';
   document.getElementById('kanbanSub').textContent=isAdmin?'Toutes les tâches de l\'équipe':'Tâches de '+CU.name.split(' ')[0];
