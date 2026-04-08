@@ -530,23 +530,23 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   margin-bottom:10px;align-items:center;flex-shrink:0;
 }
 .kanban-board{
-  display:grid;
-  grid-template-columns:repeat(5,minmax(200px,1fr));
+  display:flex;
+  flex-direction:row;
   gap:8px;
   flex:1 1 0%;
   min-height:0;
-  min-width:0;
-  width:100%;
   overflow-x:auto;
   overflow-y:hidden;
-  align-items:start;
   padding-bottom:8px;
+  width:100%;
 }
 .kanban-board::-webkit-scrollbar{height:5px;}
 .kanban-board::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .kb-col{
   background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);
   display:flex;flex-direction:column;
+  flex:0 0 220px;
+  width:220px;
   min-height:200px;
   max-height:calc(100vh - 200px);
   overflow:hidden;
