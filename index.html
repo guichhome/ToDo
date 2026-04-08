@@ -1409,7 +1409,9 @@ function renderDashboard(){
     <h3>🕐 Tâches récentes</h3>
     ${recent.map(t=>{
       const u=S.users.find(x=>t.assignees&&t.assignees.includes(x.id));
-      return `<div class="stat-row2"><span class="sk">${t.name.slice(0,28)}${t.name.length>28?'…':''}</span><span class="sv" style="display:flex;align-items:center;gap:5px;">${u?`<span class="kc-avatar" style="background:${u.color};width:18px;height:18px;font-size:8px;">${u.initials}</span>`:''}${t.done?'✅':'🔄'}</span></div>`;
+      const tName=esc(t.name.slice(0,28))+(t.name.length>28?'…':'');
+      const uHtml=u?'<span class="kc-avatar" style="background:'+u.color+';width:18px;height:18px;font-size:8px;">'+u.initials+'</span>':'';
+      return '<div class="stat-row2"><span class="sk">'+tName+'</span><span class="sv" style="display:flex;align-items:center;gap:5px;">'+uHtml+(t.done?'✅':'🔄')+'</span></div>';
     }).join('')}
   `;
   // Poles overview
@@ -1432,13 +1434,15 @@ function renderDashboard(){
     <h3>🔴 À traiter en priorité (${urgent.length})</h3>
     ${urgent.length?urgent.slice(0,5).map(t=>{
       const us=S.users.filter(u=>t.assignees&&t.assignees.includes(u.id));
-      return `<div class="stat-row2" style="cursor:pointer;" onclick="openEditTask('${t.id}')">
-        <span class="sk">${t.name.slice(0,35)}${t.name.length>35?'…':''}</span>
-        <span class="sv" style="display:flex;align-items:center;gap:4px;">
-          ${us.map(u=>`<span class="kc-avatar" style="background:${u.color};width:18px;height:18px;font-size:8px;">${u.initials}</span>`).join('')}
-          <span class="badge urg" style="font-size:9px;">URGENT</span>
-        </span>
-      </div>`;
+      const _tId=t.id;
+      const _tName=esc(t.name.slice(0,35))+(t.name.length>35?'…':'');
+      const _usHtml=us.map(u=>'<span class="kc-avatar" style="background:'+u.color+';width:18px;height:18px;font-size:8px;">'+u.initials+'</span>').join('');
+      const _status=t.done?'✅':(t.priority==='urgent'?'🔴':'🔄');
+      const _est=t.estimate?'<span style="font-size:9px;color:var(--tx3);">⏱'+t.estimate+'m</span>':'';
+      return '<div class="stat-row2" style="cursor:pointer;" onclick="openEditTask(\''+ _tId +'\'")>'+
+        '<span class="sk">'+_tName+'</span>'+
+        '<span class="sv" style="display:flex;align-items:center;gap:4px;">'+_usHtml+_status+_est+'</span>'+
+      '</div>';
     }).join(''):'<div class="empty"><div class="ei">✅</div><h3>Aucune urgente !</h3></div>'}
   `;
 }
