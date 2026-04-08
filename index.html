@@ -156,11 +156,10 @@ aside::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .ni[data-pole="atelier"].act{background:rgba(212,135,58,.1);border-color:rgba(212,135,58,.2);color:var(--atelier);}
 .ni[data-pole="commercial"].act{background:rgba(46,170,114,.1);border-color:rgba(46,170,114,.2);color:var(--commercial);}
 
-main{overflow:hidden;background:var(--bg2);position:relative;height:100%;}
+main{overflow:hidden;background:var(--bg2);position:relative;}
 main::-webkit-scrollbar{width:5px;}
 main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .page{display:none;padding:20px 22px;min-height:100%;animation:pgIn .2s ease;}
-#pg-kanban{min-height:0;padding:16px 18px;}
 .page.act{display:block;overflow-y:auto;height:100%;box-sizing:border-box;}
 @keyframes pgIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .pgh{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap;}
@@ -490,76 +489,78 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 
 #kanbanAdminBar{flex-shrink:0;}
 
+
+
+/* Wrapper qui scrolle horizontalement */
+/* Board interne - taille naturelle des colonnes */
+/* Colonnes */
+/* Cards scrollables */
+
 /* ═══ KANBAN ═══ */
-#pg-kanban{padding:16px 18px;box-sizing:border-box;}
+#pg-kanban{padding:0;}
 #pg-kanban.act{
-  display:flex !important;
+  position:absolute;
+  top:0; left:0; right:0; bottom:0;
+  display:flex;
   flex-direction:column;
-  height:100%;
-  min-height:0;
+  padding:12px 14px;
   overflow:hidden;
+  box-sizing:border-box;
 }
-.kanban-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center;flex-shrink:0;}
+.kanban-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center;flex-shrink:0;}
+.kanban-scroll{
+  flex:1;
+  min-height:0;
+  overflow-x:auto;
+  overflow-y:hidden;
+  display:flex;
+  flex-direction:column;
+}
+.kanban-scroll::-webkit-scrollbar{height:6px;}
+.kanban-scroll::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .kanban-board{
   display:flex;
   flex-direction:row;
   flex-wrap:nowrap;
   gap:8px;
-  overflow-x:auto;
-  overflow-y:hidden;
   flex:1;
-  height:0;
-  align-items:stretch;
+  min-height:0;
 }
-.kanban-board::-webkit-scrollbar{height:6px;}
-.kanban-board::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .kb-col{
   flex:0 0 220px;
   min-width:220px;
-  max-width:220px;
-  height:100%;
+  display:flex;
+  flex-direction:column;
   background:var(--sf);
   border:1px solid var(--bd);
   border-radius:var(--r);
-  display:flex;
-  flex-direction:column;
   overflow:hidden;
+  min-height:0;
 }
-.kb-col-hd{
-  padding:10px 12px;
-  border-bottom:1px solid var(--bd);
-  display:flex;align-items:center;justify-content:space-between;
-  flex-shrink:0;
-}
+.kb-col-hd{padding:10px 12px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .kb-col-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--tx2);display:flex;align-items:center;gap:7px;}
 .kb-col-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .kb-count{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--tx3);background:var(--sf3);padding:1px 7px;border-radius:10px;}
 .kb-cards{
   flex:1;
-  height:0;
+  min-height:0;
   overflow-y:auto;
   overflow-x:hidden;
-  padding:8px;
+  padding:6px;
   display:flex;
   flex-direction:column;
-  gap:6px;
+  gap:5px;
 }
 .kb-cards::-webkit-scrollbar{width:3px;}
 .kb-cards::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .kb-card{
-  background:var(--sf2);
-  border:1px solid var(--bd);
-  border-radius:var(--rs);
+  background:var(--sf2);border:1px solid var(--bd);border-radius:var(--rs);
   border-left:3px solid var(--card-color,var(--bd2));
-  padding:10px 11px;
-  cursor:grab;
-  transition:all var(--tr);
+  padding:10px 11px;cursor:grab;
   flex-shrink:0;
-  min-width:0;
-  overflow:hidden;
-  word-break:break-word;
+  transition:background var(--tr),border-color var(--tr);
 }
-.kb-card:hover{background:var(--sf3);border-color:var(--bd2);box-shadow:var(--sh);}
+.kb-card:hover{background:var(--sf3);border-color:var(--bd2);}
 .kb-card.dragging{opacity:.5;transform:rotate(2deg);cursor:grabbing;}
 .kb-card.drag-over{border-color:var(--brand);background:var(--brand-xs);}
 .kb-card.kb-readonly{opacity:.75;cursor:default;}
@@ -678,7 +679,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
         <!-- Filtres injectés dynamiquement selon le rôle -->
       </div>
     </div>
-    <div class="kanban-board" id="kanbanBoard"></div>
+    <div class="kanban-scroll"><div class="kanban-board" id="kanbanBoard"></div></div>
   </div>
 
   <!-- ── PROJETS ── -->
@@ -1581,12 +1582,8 @@ function kanbanDrop(e,status){
     }
     if(status==='done'){
       t.done=true;
-      // Archive automatiquement après un court délai (laisse le temps de voir la carte)
-      setTimeout(()=>{
-        t.archived=true;
-        save();renderAll();
-        toast('✅ "'+t.name.slice(0,22)+'" terminée et archivée','s');
-      }, 1500);
+      t.archived=true;
+      toast('✅ "'+t.name.slice(0,22)+'" terminée et archivée','s');
     } else if(status==='cancelled'){
       t.done=false;
     } else {
