@@ -526,6 +526,11 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .kc-avatar{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;flex-shrink:0;}
 .kc-uname{font-size:11px;color:var(--tx3);}
 .kc-time{font-size:10px;color:var(--tx3);font-family:'JetBrains Mono',monospace;}
+
+#kanbanWrap{overflow-x:auto;overflow-y:hidden;}
+#kanbanWrap::-webkit-scrollbar{height:6px;}
+#kanbanWrap::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
+.kanban-board{display:flex;flex-direction:row;flex-wrap:nowrap;gap:8px;height:100%;padding-bottom:6px;}
 </style>
 </head>
 <body>
@@ -1485,13 +1490,21 @@ function renderKanban(){
     '</div>';
   }).join('');
 
-  // Hauteur calculée par JS - approche la plus fiable
-  const wrap=document.getElementById('kanbanWrap');
-  if(wrap){
+  // Hauteur calculée: plusieurs tentatives pour être sûr
+  function _setKanbanH(){
+    const wrap=document.getElementById('kanbanWrap');
+    if(!wrap||S.cur!=='kanban')return;
     const top=wrap.getBoundingClientRect().top;
     const h=window.innerHeight-top-10;
-    wrap.style.cssText='overflow-x:auto;overflow-y:hidden;height:'+h+'px;';
-    board.style.cssText='display:flex;flex-direction:row;flex-wrap:nowrap;gap:8px;height:100%;';
+    if(h>100){ wrap.style.height=h+'px'; }
+  }
+  // 3 tentatives: immédiate, après rendu, après layout complet
+  _setKanbanH();
+  requestAnimationFrame(_setKanbanH);
+  setTimeout(_setKanbanH,100);
+  if(!window._kanbanResizeSet){
+    window._kanbanResizeSet=true;
+    window.addEventListener('resize',()=>{ if(S.cur==='kanban') _setKanbanH(); });
   }
 }
 function kanbanCard(t){
