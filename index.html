@@ -493,7 +493,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 /* ═══ KANBAN ═══ */
 #pg-kanban{padding:16px 18px;box-sizing:border-box;}
 #pg-kanban.act{
-  display:flex;
+  display:flex !important;
   flex-direction:column;
   height:100%;
   min-height:0;
@@ -508,7 +508,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   overflow-x:auto;
   overflow-y:hidden;
   flex:1;
-  min-height:0;
+  height:0;
   align-items:stretch;
 }
 .kanban-board::-webkit-scrollbar{height:6px;}
@@ -517,6 +517,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   flex:0 0 220px;
   min-width:220px;
   max-width:220px;
+  height:100%;
   background:var(--sf);
   border:1px solid var(--bd);
   border-radius:var(--r);
@@ -534,14 +535,14 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .kb-col-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .kb-count{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--tx3);background:var(--sf3);padding:1px 7px;border-radius:10px;}
 .kb-cards{
+  flex:1;
+  height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
   padding:8px;
   display:flex;
   flex-direction:column;
   gap:6px;
-  overflow-y:auto;
-  overflow-x:hidden;
-  flex:1;height:0;
-  min-height:40px;
 }
 .kb-cards::-webkit-scrollbar{width:3px;}
 .kb-cards::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
