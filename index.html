@@ -497,77 +497,22 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 /* Cards scrollables */
 
 
-/* ═══ KANBAN ═══ */
+
+
+
+/* KANBAN */
 #pg-kanban{padding:12px 14px;box-sizing:border-box;}
-#pg-kanban.act{display:flex !important;flex-direction:column;}
-.kanban-header-area{flex-shrink:0;margin-bottom:8px;}
-.kanban-filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
-
-/* Le wrapper scrollable a une hauteur CALCULÉE explicite */
-.kanban-scroll{
-  height:calc(100vh - 56px - 80px);
-  min-height:200px;
-  overflow-x:auto;
-  overflow-y:hidden;
-  display:flex;
-  flex-direction:row;
-}
-.kanban-scroll::-webkit-scrollbar{height:6px;}
-.kanban-scroll::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
-
-/* Board = taille naturelle (pas de width contrainte) */
-.kanban-board{
-  display:flex;
-  flex-direction:row;
-  flex-wrap:nowrap;
-  gap:8px;
-  height:100%;
-  padding-bottom:6px;
-}
-
-/* Colonnes */
-.kb-col{
-  flex:0 0 220px;
-  min-width:220px;
-  height:100%;
-  display:flex;
-  flex-direction:column;
-  background:var(--sf);
-  border:1px solid var(--bd);
-  border-radius:var(--r);
-  overflow:hidden;
-}
-.kb-col-hd{
-  padding:10px 12px;border-bottom:1px solid var(--bd);
-  display:flex;align-items:center;justify-content:space-between;
-  flex-shrink:0;
-}
+.kb-col{flex:0 0 220px;min-width:220px;display:flex;flex-direction:column;background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;}
+.kb-col-hd{padding:10px 12px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .kb-col-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--tx2);display:flex;align-items:center;gap:7px;}
 .kb-col-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .kb-count{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--tx3);background:var(--sf3);padding:1px 7px;border-radius:10px;}
-
-/* Cards — scroll vertical illimité */
-.kb-cards{
-  flex:1;
-  overflow-y:auto;
-  overflow-x:hidden;
-  padding:6px;
-  display:flex;
-  flex-direction:column;
-  gap:5px;
-}
+.kb-cards{flex:1;overflow-y:auto;overflow-x:hidden;padding:6px;display:flex;flex-direction:column;gap:5px;}
 .kb-cards::-webkit-scrollbar{width:3px;}
 .kb-cards::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
-.kb-card{
-  background:var(--sf2);border:1px solid var(--bd);border-radius:var(--rs);
-  border-left:3px solid var(--card-color,var(--bd2));
-  padding:10px 11px;cursor:grab;
-  flex-shrink:0;
-  transition:background var(--tr),border-color var(--tr);
-}
-.kb-card:hover{background:var(--sf3);border-color:var(--bd2);}
-.kb-card.dragging{opacity:.5;transform:rotate(2deg);cursor:grabbing;}
-.kb-card.drag-over{border-color:var(--brand);background:var(--brand-xs);}
+.kb-card{background:var(--sf2);border:1px solid var(--bd);border-radius:var(--rs);border-left:3px solid var(--card-color,var(--bd2));padding:10px 11px;cursor:grab;flex-shrink:0;}
+.kb-card:hover{background:var(--sf3);}
+.kb-card.dragging{opacity:.5;transform:rotate(2deg);}
 .kb-card.kb-readonly{opacity:.75;cursor:default;}
 .kb-col.drag-over-col{border-color:var(--brand);}
 .kb-user-chip{display:flex;align-items:center;gap:5px;padding:4px 10px 4px 5px;border-radius:20px;border:2px solid var(--bd2);background:var(--sf2);cursor:pointer;font-size:12px;color:var(--tx3);user-select:none;}
@@ -684,7 +629,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
         <!-- Filtres injectés dynamiquement selon le rôle -->
       </div>
     </div>
-    <div class="kanban-scroll"><div class="kanban-board" id="kanbanBoard"></div></div>
+    <div id="kanbanWrap"><div class="kanban-board" id="kanbanBoard"></div></div>
   </div>
 
   <!-- ── PROJETS ── -->
@@ -911,12 +856,6 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 <div class="toast" id="toast"></div>
 
 <script>
-
-// ╔══════════════════════════════════════════════════════════════╗
-//   GUICH'HOME ERP — v3.0
-//   Multi-utilisateurs, Pôles métier, Kanban, Stats, Archives
-// ╚══════════════════════════════════════════════════════════════╝
-
 const POLES = [
   {id:'arch',   label:'Architecture',    ico:'📐', color:'--arch'},
   {id:'compta', label:'Comptabilité',    ico:'💰', color:'--compta'},
@@ -1519,35 +1458,34 @@ function toggleKanbanUser(uid){
 function renderKanban(){
   if(!CU)return;
   if(S.cur!=='kanban')return;
-  // Ajustement dynamique de la hauteur du scroll
-  requestAnimationFrame(()=>{
-    const pg=document.getElementById('pg-kanban');
-    const scroll=document.querySelector('.kanban-scroll');
-    if(pg&&scroll){
-      const pgRect=pg.getBoundingClientRect();
-      const scrollTop=scroll.getBoundingClientRect().top;
-      const h=window.innerHeight-scrollTop-20;
-      if(h>100)scroll.style.height=h+'px';
-    }
-  });
   const isAdmin=CU.role==='admin'||CU.role==='manager';
   document.getElementById('kanbanTitle').textContent='Kanban';
-  document.getElementById('kanbanSub').textContent=isAdmin?'Toutes les tâches de l\'équipe':'Tâches de '+CU.name.split(' ')[0];
+  document.getElementById('kanbanSub').textContent=isAdmin?'Vue équipe complète':'Tâches de '+CU.name.split(' ')[0];
   document.getElementById('kanbanActions').innerHTML='<button class="btn pri sm" onclick="openNewTask()">+ Tâche</button>';
+
   const board=document.getElementById('kanbanBoard');
   board.innerHTML=STATUSES.map(st=>{
     let tasks=S.tasks.filter(t=>t.status===st.id&&!t.archived&&!t.deleted);
     if(!isAdmin) tasks=tasks.filter(t=>t.assignees&&t.assignees.includes(CU.id));
     const cards=tasks.map(t=>kanbanCard(t)).join('');
-    const empty=tasks.length?'':'<div style="padding:20px;text-align:center;color:var(--tx4);font-size:12px;">Vide</div>';
-    const dragOver='ondragover="kanbanDragOver(event,&quot;'+st.id+'&quot;)"';
-    const drop='ondrop="kanbanDrop(event,&quot;'+st.id+'&quot;)"';
-    return '<div class="kb-col" id="kbc-'+st.id+'" '+dragOver+' '+drop+' ondragleave="kanbanDragLeave(event)">'+
+    const empty=tasks.length?'':'<div style="padding:16px;text-align:center;color:var(--tx4);font-size:12px;">Vide</div>';
+    const dOver='ondragover="kanbanDragOver(event,&quot;'+st.id+'&quot;)"';
+    const dDrop='ondrop="kanbanDrop(event,&quot;'+st.id+'&quot;)"';
+    return '<div class="kb-col" id="kbc-'+st.id+'" '+dOver+' '+dDrop+' ondragleave="kanbanDragLeave(event)">'+
       '<div class="kb-col-hd"><div class="kb-col-title"><div class="kb-col-dot" style="background:'+st.color+'"></div>'+esc(st.label)+'</div>'+
       '<span class="kb-count">'+tasks.length+'</span></div>'+
       '<div class="kb-cards" id="kbc-cards-'+st.id+'">'+cards+empty+'</div>'+
     '</div>';
   }).join('');
+
+  // Hauteur calculée par JS - approche la plus fiable
+  const wrap=document.getElementById('kanbanWrap');
+  if(wrap){
+    const top=wrap.getBoundingClientRect().top;
+    const h=window.innerHeight-top-10;
+    wrap.style.cssText='overflow-x:auto;overflow-y:hidden;height:'+h+'px;';
+    board.style.cssText='display:flex;flex-direction:row;flex-wrap:nowrap;gap:8px;height:100%;';
+  }
 }
 function kanbanCard(t){
   const pole=POLES.find(p=>p.id===t.pole);
@@ -2718,6 +2656,4 @@ renderColorPicker(AVATAR_COLORS[0]);
 
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 
-</script>
-</body>
-</html>
+
