@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0A0806" id="mc">
 <title>Guich'Home ERP</title>
 <link rel="manifest" href="manifest.json">
@@ -514,9 +515,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   .trow-right .tbt{width:22px;height:22px;}
 }
 
-/* ══════════════════════════════
-   KANBAN — CSS PROPRE
-══════════════════════════════ */
+/* KANBAN v3.4 - 1775641205 */
 #pg-kanban{padding:16px 18px;overflow:visible;width:100%;box-sizing:border-box;}
 #pg-kanban.act{
   display:flex !important;
@@ -1546,6 +1545,12 @@ function toggleKanbanUser(uid){
 function renderKanban(){
   if(!CU)return;
   if(S.cur!=='kanban')return;
+  // Debug: vérifier le CSS appliqué
+  const _bd=document.getElementById('kanbanBoard');
+  if(_bd){
+    const _cs=window.getComputedStyle(_bd);
+    console.log('[Kanban CSS] display:'+_cs.display+' flex-dir:'+_cs.flexDirection+' width:'+_cs.width);
+  }
   const isAdmin=CU.role==='admin'||CU.role==='manager';
   document.getElementById('kanbanTitle').textContent='Kanban';
   document.getElementById('kanbanSub').textContent=isAdmin?'Toutes les tâches de l\'équipe':'Tâches de '+CU.name.split(' ')[0];
@@ -2661,7 +2666,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '3.3';
+const APP_VERSION = '3.4';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
