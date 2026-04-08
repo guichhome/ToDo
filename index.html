@@ -517,10 +517,13 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 /* ══════════════════════════════
    KANBAN — CSS PROPRE
 ══════════════════════════════ */
-#pg-kanban{padding:16px 18px;}
+#pg-kanban{padding:16px 18px;overflow:visible;width:100%;box-sizing:border-box;}
 #pg-kanban.act{
   display:flex !important;
   flex-direction:column;
+  overflow:visible;
+  width:100%;
+  box-sizing:border-box;
 }
 .kanban-filters{
   display:flex;gap:6px;flex-wrap:wrap;
@@ -528,12 +531,12 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 }
 .kanban-board{
   display:grid;
-  grid-template-columns:repeat(5,minmax(220px,1fr));
-  gap:10px;
+  grid-template-columns:repeat(5,minmax(200px,1fr));
+  gap:8px;
   flex:1 1 0%;
   min-height:0;
+  min-width:0;
   width:100%;
-  align-self:stretch;
   overflow-x:auto;
   overflow-y:hidden;
   align-items:start;
