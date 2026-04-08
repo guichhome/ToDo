@@ -185,6 +185,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .login-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--tx);text-align:center;margin-bottom:6px;}
 .login-sub{font-size:12px;color:var(--tx3);text-align:center;margin-bottom:24px;font-family:'JetBrains Mono',monospace;}
 .user-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px;}
+#userGrid{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-bottom:24px;min-height:60px;}
 .user-card{
   padding:14px 10px;border-radius:10px;border:2px solid var(--bd);
   background:var(--sf2);cursor:pointer;transition:all var(--tr);text-align:center;
@@ -2579,7 +2580,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '3.4';
+const APP_VERSION = '3.5';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
