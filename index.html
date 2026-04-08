@@ -711,20 +711,6 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
         <!-- Filtres injectés dynamiquement selon le rôle -->
       </div>
     </div>
-    <!-- Sélection multi-utilisateurs admin -->
-    <div id="kanbanAdminBar" style="display:none;margin-bottom:12px;padding:10px 12px;background:var(--sf);border:1px solid var(--bd);border-radius:8px;">
-      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--tx3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px;">
-        👁 Superviser les utilisateurs
-      </div>
-      <div id="kanbanUserChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-        <select class="fi" style="width:auto;padding:5px 10px;font-size:12px;" id="kanbanPoleFilter" onchange="renderKanban()">
-          <option value="">Tous les pôles</option>
-        </select>
-        <button class="btn sm ghost" onclick="kanbanSelectAll()" style="font-size:12px;">Tous</button>
-        <button class="btn sm ghost" onclick="kanbanSelectNone()" style="font-size:12px;">Aucun</button>
-      </div>
-    </div>
     <div class="kanban-board" id="kanbanBoard"></div>
   </div>
 
@@ -1561,78 +1547,22 @@ function renderKanban(){
   if(!CU)return;
   if(S.cur!=='kanban')return;
   const isAdmin=CU.role==='admin'||CU.role==='manager';
-
-
-  // ── Titre ──
-  document.getElementById('kanbanTitle').textContent=isAdmin?'Kanban — Supervision':'Mon Kanban';
-  const selCount=kanbanSelectedUsers.length;
-  document.getElementById('kanbanSub').textContent=isAdmin
-    ?(selCount===0?'Toutes les tâches de l\'équipe':selCount+' utilisateur(s) affiché(s)')
-    :'Tâches assignées à '+CU.name.split(' ')[0];
-
-  // Bouton + Tâche
+  document.getElementById('kanbanTitle').textContent='Kanban';
+  document.getElementById('kanbanSub').textContent=isAdmin?'Toutes les tâches de l\'équipe':'Tâches de '+CU.name.split(' ')[0];
   document.getElementById('kanbanActions').innerHTML='<button class="btn pri sm" onclick="openNewTask()">+ Tâche</button>';
-
-  // ── Barre admin ──
-  const adminBar=document.getElementById('kanbanAdminBar');
-  if(isAdmin){
-    adminBar.style.display='flex';
-    adminBar.style.flexDirection='column';
-    adminBar.style.width='100%';
-    adminBar.style.overflow='hidden';
-    // Pole filter
-    const pfEl=document.getElementById('kanbanPoleFilter');
-    const savedPole=pfEl?pfEl.value:'';
-    pfEl.innerHTML='<option value="">Tous les pôles</option>'+
-      POLES.map(p=>`<option value="${p.id}" ${p.id===savedPole?'selected':''}>${p.ico} ${p.label}</option>`).join('');
-    // User chips — chip coloré sélectionné = affiché (vide = tous)
-    document.getElementById('kanbanUserChips').innerHTML=S.users.map(u=>{
-      const active=selCount===0||kanbanSelectedUsers.includes(u.id);
-      return '<div class="kb-user-chip '+(active?'sel':'')+'" data-uid="'+u.id+'" onclick="toggleKanbanUser(\'' +u.id+ '\')">'+
-        '<div class="av" style="background:'+u.color+'">'+u.initials+'</div>'+
-        u.name.split(' ')[0]+
-      '</div>';
-    }).join('');
-  }else{
-    adminBar.style.display='none';
-  }
-
-  // ── Filtrage ──
-  const pfEl2=document.getElementById('kanbanPoleFilter');
-  const pf=isAdmin&&pfEl2?pfEl2.value:'';
-
   const board=document.getElementById('kanbanBoard');
   board.innerHTML=STATUSES.map(st=>{
     let tasks=S.tasks.filter(t=>t.status===st.id&&!t.archived&&!t.deleted);
-    if(!isAdmin){
-      // Employé : tâches assignées OU créées par cet utilisateur
-      tasks=tasks.filter(t=>
-        (t.assignees&&t.assignees.includes(CU.id))||
-        (t.createdBy&&t.createdBy===CU.id)
-      );
-    }else{
-      // Admin : filtre par utilisateurs si sélection active
-      if(selCount>0){
-        tasks=tasks.filter(t=>t.assignees&&t.assignees.some(uid=>kanbanSelectedUsers.includes(uid)));
-      }
-      if(pf)tasks=tasks.filter(t=>t.pole===pf);
-    }
+    if(!isAdmin) tasks=tasks.filter(t=>t.assignees&&t.assignees.includes(CU.id));
     const cards=tasks.map(t=>kanbanCard(t)).join('');
-    const empty=tasks.length===0?'<div style="padding:20px;text-align:center;color:var(--tx4);font-size:12px;">Vide</div>':'';
-    const col=
-      '<div class="kb-col" id="kbc-'+st.id+'"'+
-      ' ondragover="kanbanDragOver(event,\''+st.id+'\')"'+
-      ' ondrop="kanbanDrop(event,\''+st.id+'\')"'+
-      ' ondragleave="kanbanDragLeave(event)">'+
-      '<div class="kb-col-hd">'+
-        '<div class="kb-col-title"><div class="kb-col-dot" style="background:'+st.color+'"></div>'+esc(st.label)+'</div>'+
-        '<span class="kb-count">'+tasks.length+'</span>'+
-      '</div>'+
-      '<div class="kb-cards" id="kbc-cards-'+st.id+'">'+
-        cards+empty+
-      '</div>'+
+    const empty=tasks.length?'':'<div style="padding:20px;text-align:center;color:var(--tx4);font-size:12px;">Vide</div>';
+    const dragOver='ondragover="kanbanDragOver(event,&quot;'+st.id+'&quot;)"';
+    const drop='ondrop="kanbanDrop(event,&quot;'+st.id+'&quot;)"';
+    return '<div class="kb-col" id="kbc-'+st.id+'" '+dragOver+' '+drop+' ondragleave="kanbanDragLeave(event)">'+
+      '<div class="kb-col-hd"><div class="kb-col-title"><div class="kb-col-dot" style="background:'+st.color+'"></div>'+esc(st.label)+'</div>'+
+      '<span class="kb-count">'+tasks.length+'</span></div>'+
+      '<div class="kb-cards" id="kbc-cards-'+st.id+'">'+cards+empty+'</div>'+
     '</div>';
-    return col;
   }).join('');
 }
 function kanbanCard(t){
