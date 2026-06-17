@@ -682,6 +682,52 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .proj-dragging{opacity:.4;transform:scale(.97);}
 .proj-drop-target{border-color:var(--brand) !important;background:var(--brand-xs) !important;box-shadow:0 0 0 2px var(--brand) inset;transform:scale(1.02);}
 .crumb-item.crumb-drop{background:var(--brand);color:#fff;box-shadow:0 0 0 2px var(--brand);}
+
+/* ═══ MODÈLES DE TÂCHES ═══ */
+.tpl-search-wrap{position:relative;}
+.tpl-dropdown{display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:var(--sf);border:1px solid var(--bd2);border-radius:var(--rs);box-shadow:var(--shl);max-height:240px;overflow-y:auto;margin-top:2px;}
+.tpl-opt{padding:9px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid var(--bd);transition:background var(--tr);}
+.tpl-opt:last-child{border-bottom:none;}
+.tpl-opt:hover{background:var(--brand-xs);}
+.tpl-opt-name{font-size:13px;color:var(--tx);font-weight:500;}
+.tpl-opt-meta{font-size:11px;color:var(--tx3);font-family:'JetBrains Mono',monospace;white-space:nowrap;}
+.tpl-opt-empty{padding:10px 12px;font-size:12px;color:var(--tx3);}
+/* Formulaire modèle */
+.tpl-form{background:var(--sf2);border:1px solid var(--bd);border-radius:var(--rs);padding:14px;margin-bottom:16px;}
+.tpl-list-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--tx2);margin-bottom:8px;}
+.tpl-list{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;}
+.tpl-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--sf2);border:1px solid var(--bd);border-radius:var(--rs);padding:9px 12px;}
+.tpl-info{min-width:0;flex:1;}
+.tpl-name{font-size:13px;font-weight:500;color:var(--tx);}
+.tpl-meta{font-size:11px;color:var(--tx3);font-family:'JetBrains Mono',monospace;margin-top:2px;}
+.tpl-acts{display:flex;gap:4px;flex-shrink:0;}
+
+/* ═══ STATS RENDEMENTS ═══ */
+.yield-tpl{background:var(--sf2);border:1px solid var(--bd);border-radius:var(--rs);padding:12px 14px;margin-bottom:10px;}
+.yield-tpl-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--bd);}
+.yield-tpl-name{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--tx);}
+.yield-tpl-est{font-size:11px;color:var(--tx3);font-family:'JetBrains Mono',monospace;}
+.yield-user{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;}
+.yield-u-left{display:flex;align-items:center;gap:8px;min-width:0;}
+.yield-uname{font-size:13px;color:var(--tx);font-weight:500;}
+.yield-tag{font-size:10px;padding:1px 7px;border-radius:8px;font-weight:600;white-space:nowrap;}
+.yield-tag.fast{background:var(--obg);color:var(--ok);}
+.yield-tag.slow{background:var(--ubg);color:var(--urgent);}
+.yield-u-right{text-align:right;flex-shrink:0;}
+.yield-val{font-size:13px;color:var(--tx);font-family:'JetBrains Mono',monospace;}
+.yield-detail{font-size:10px;color:var(--tx3);font-family:'JetBrains Mono',monospace;margin-top:1px;}
+/* Performance */
+.perf-row{display:flex;align-items:center;gap:12px;margin-top:10px;}
+.perf-u{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--tx);width:110px;flex-shrink:0;}
+.perf-bar-wrap{flex:1;height:12px;background:var(--bd);border-radius:6px;overflow:hidden;min-width:50px;}
+.perf-bar{height:100%;border-radius:6px;transition:width .8s;}
+.perf-val{flex-shrink:0;text-align:right;font-family:'JetBrains Mono',monospace;font-size:13px;min-width:120px;}
+.perf-detail{font-size:10px;color:var(--tx4);font-family:'JetBrains Mono',monospace;margin:2px 0 6px 122px;}
+@media(max-width:600px){
+  .perf-u{width:80px;font-size:11px;}
+  .perf-val{min-width:90px;font-size:11px;}
+  .perf-detail{margin-left:0;}
+}
 </style>
 </head>
 <body>
@@ -908,6 +954,12 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     <div class="mt" id="moTaskTitle">Nouvelle tâche</div>
     <div id="taskScopeNote" style="display:none;background:var(--brand-xs);border:1px solid rgba(212,135,58,.25);border-radius:6px;padding:8px 12px;font-size:12px;color:var(--tx2);margin-bottom:12px;"></div>
     <input type="hidden" id="editTaskId"/>
+    <input type="hidden" id="mt-tplId"/>
+    <div class="fg tpl-search-wrap">
+      <label class="fl">📋 Partir d'un modèle <span style="color:var(--tx4);font-weight:400;">(optionnel)</span><span id="tplManageLink"> · <span onclick="openTemplateManager()" style="color:var(--brand);cursor:pointer;font-size:11px;">gérer les modèles</span></span></label>
+      <input type="text" class="fi" id="mt-tplsearch" placeholder="🔍 Tapez : découpe, ponçage, vernis…" autocomplete="off" oninput="filterTemplates(this.value)" onfocus="filterTemplates(this.value)"/>
+      <div class="tpl-dropdown" id="tplDropdown"></div>
+    </div>
     <div class="fg"><label class="fl">Nom de la tâche *</label><input type="text" class="fi" id="mt-n" placeholder="Ex: Pose des dormants fenêtre salon" onkeydown="if(event.key==='Enter')saveTask()"/></div>
     <div class="fr">
       <div class="fg"><label class="fl">Projet</label><select class="fs" id="mt-proj"></select></div>
@@ -915,8 +967,12 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     </div>
     <div class="fg"><label class="fl">Pôle métier</label><div class="pole-grid" id="polePicker"></div></div>
     <div class="fg"><label class="fl">Assigner à</label><div class="user-sel-grid" id="userPicker"></div></div>
-    <div class="fr3">
+    <div id="mt-perm-note" style="display:none;background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:7px 11px;font-size:11px;color:var(--tx3);margin-bottom:10px;">🔒 Le temps estimé et la quantité sont définis par l'administration.</div>
+    <div class="fr">
       <div class="fg"><label class="fl">Estimation (min)</label><input type="number" class="fi" id="mt-est" placeholder="Ex: 90" min="0"/></div>
+      <div class="fg"><label class="fl">Quantité <span style="color:var(--tx4);font-weight:400;">(pour rendements)</span></label><div style="display:flex;gap:5px;"><input type="number" class="fi" id="mt-qty" placeholder="Ex: 15" min="0" step="any" style="flex:1;min-width:0;"/><select class="fs" id="mt-unit" style="width:80px;flex-shrink:0;"><option value="">—</option><option value="ml">ml</option><option value="m2">m²</option><option value="u">unité</option><option value="h">heure</option></select></div></div>
+    </div>
+    <div class="fr">
       <div class="fg"><label class="fl">Date début</label><input type="date" class="fi" id="mt-dstart"/></div>
       <div class="fg"><label class="fl">Date fin</label><input type="date" class="fi" id="mt-dend"/></div>
     </div>
@@ -961,6 +1017,28 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     <div class="mt">Déplacer vers…</div>
     <div class="move-list" id="moveList"></div>
     <div class="ma"><button class="btn" onclick="closeModal('moMove')">Annuler</button></div>
+  </div>
+</div>
+
+<!-- Modal Gestion des modèles -->
+<div class="mo" id="moTemplates">
+  <div class="mbox wide">
+    <div class="mt">📋 Modèles de tâches</div>
+    <div style="font-size:12px;color:var(--tx3);margin-bottom:14px;">Préparez vos tâches répétitives (découpe, ponçage, vernis…) avec leur temps estimé et leur unité. Vous pourrez les réutiliser en un clic.</div>
+    <div class="tpl-form">
+      <input type="hidden" id="tpl-editId"/>
+      <div class="fg"><label class="fl">Nom du modèle *</label><input type="text" class="fi" id="tpl-name" placeholder="Ex: Découpe panneaux"/></div>
+      <div class="fr3">
+        <div class="fg"><label class="fl">Temps estimé (min)</label><input type="number" class="fi" id="tpl-est" placeholder="Ex: 90" min="0"/></div>
+        <div class="fg"><label class="fl">Unité</label><select class="fs" id="tpl-unit"></select></div>
+        <div class="fg"><label class="fl">Pôle</label><select class="fs" id="tpl-pole"></select></div>
+      </div>
+      <div class="fg"><label class="fl">Notes (préremplies)</label><textarea class="fta" id="tpl-notes" placeholder="Instructions par défaut..." style="min-height:50px;"></textarea></div>
+      <div style="display:flex;gap:8px;"><button class="btn pri sm" id="tplFormBtn" onclick="saveTemplate()">+ Ajouter le modèle</button><button class="btn sm" onclick="resetTemplateForm()">Vider</button></div>
+    </div>
+    <div class="tpl-list-title">Modèles enregistrés</div>
+    <div class="tpl-list" id="tplList"></div>
+    <div class="ma"><button class="btn" onclick="closeModal('moTemplates')">Fermer</button></div>
   </div>
 </div>
 
@@ -1097,6 +1175,7 @@ async function syncNow(){
 function save(){
   localStorage.setItem('gh_erp',JSON.stringify({
     users:S.users,tasks:S.tasks,projects:S.projects,
+    templates:S.templates,
     notifications:S.notifications,
     tsec:S.tsec,surl:S.surl,theme:S.theme,
     sidebarOpen:S.sidebarOpen,
@@ -1134,6 +1213,7 @@ function load(){
     const d=JSON.parse(localStorage.getItem('gh_erp')||'{}');
     Object.assign(S,{
       users:d.users||[],tasks:d.tasks||[],projects:d.projects||[],
+      templates:d.templates||[],
       notifications:d.notifications||[],
       tsec:d.tsec||0,surl:d.surl||DEFAULT_SURL||'',theme:d.theme||'dark',
       sidebarOpen:d.sidebarOpen!==undefined?d.sidebarOpen:true,
@@ -1411,6 +1491,7 @@ async function silentImport(){
 
     // Remplacement avec préservation des timers actifs
     S.projects = d.projects;
+    if(Array.isArray(d.templates)) S.templates = d.templates;
     S.tasks = d.tasks.map(t=>{
       const loc = S.tasks.find(x=>x.id===t.id);
       return {...t,
@@ -1423,6 +1504,7 @@ async function silentImport(){
     // Sauvegarde locale sans re-déclencher l'export
     localStorage.setItem('gh_erp',JSON.stringify({
       users:S.users,tasks:S.tasks,projects:S.projects,
+      templates:S.templates,
       notifications:S.notifications,
       tsec:S.tsec,surl:S.surl,theme:S.theme,
       sidebarOpen:S.sidebarOpen,
@@ -2623,7 +2705,81 @@ function renderStats(){
       })
     },
   ];
-  grid.innerHTML=projChart+blocks.map(b=>{
+  // ═══ RENDEMENTS PAR MODÈLE + PERFORMANCE ═══
+  const doneT=tasks.filter(t=>t.done);
+  const unitLbl={ml:'ml',m2:'m\u00b2',u:'u',h:'h'};
+
+  // Rendements par modèle (groupé par template puis par utilisateur)
+  const byTpl={};
+  doneT.forEach(t=>{ if(t.templateId){(byTpl[t.templateId]=byTpl[t.templateId]||[]).push(t);} });
+  let yieldHtml='';
+  Object.keys(byTpl).forEach(tplId=>{
+    const tpl=(S.templates||[]).find(x=>x.id===tplId);
+    if(!tpl)return;
+    const byUser={};
+    byTpl[tplId].forEach(t=>{ (t.assignees||[]).forEach(uid=>{
+      const d=byUser[uid]=byUser[uid]||{qty:0,time:0,count:0,est:0};
+      d.qty+=(t.quantity||0);d.time+=(t.elapsed||0);d.count++;d.est+=(t.estimate||0);
+    });});
+    // Trier par rendement (plus rapide d'abord) si quantité, sinon par temps moyen
+    let rows=Object.keys(byUser).map(uid=>{
+      const u=S.users.find(x=>x.id===uid);
+      const d=byUser[uid];
+      const minPerUnit=d.qty>0?((d.time/60)/d.qty):null;
+      const avgMin=d.count>0?(d.time/60/d.count):0;
+      return {u,d,minPerUnit,avgMin};
+    }).filter(r=>r.u);
+    // Tri : par rendement croissant (rapide) si dispo, sinon temps moyen croissant
+    const hasQty=rows.some(r=>r.minPerUnit!=null);
+    rows.sort((a,b)=>{
+      if(hasQty)return (a.minPerUnit==null?9e9:a.minPerUnit)-(b.minPerUnit==null?9e9:b.minPerUnit);
+      return a.avgMin-b.avgMin;
+    });
+    let userRows='';
+    rows.forEach((r,i)=>{
+      const fast=i===0&&rows.length>1;
+      const slow=i===rows.length-1&&rows.length>1;
+      const tag=fast?'<span class="yield-tag fast">\u26a1 rapide</span>':(slow?'<span class="yield-tag slow">\ud83d\udc0c lent</span>':'');
+      const yieldTxt=r.minPerUnit!=null?'<b>'+r.minPerUnit.toFixed(1)+'</b> min/'+(unitLbl[tpl.unit]||'u'):'<b>'+Math.round(r.avgMin)+'</b> min/t\u00e2che';
+      const detail=(r.d.qty>0?r.d.qty+' '+(unitLbl[tpl.unit]||'u')+' \u00b7 ':'')+fmt(r.d.time)+' \u00b7 '+r.d.count+' t\u00e2che'+(r.d.count>1?'s':'');
+      userRows+='<div class="yield-user">'+
+        '<div class="yield-u-left"><span class="kc-av" style="background:'+r.u.color+'">'+r.u.initials+'</span><span class="yield-uname">'+esc(r.u.name.split(' ')[0])+'</span>'+tag+'</div>'+
+        '<div class="yield-u-right"><div class="yield-val">'+yieldTxt+'</div><div class="yield-detail">'+detail+'</div></div>'+
+      '</div>';
+    });
+    yieldHtml+='<div class="yield-tpl">'+
+      '<div class="yield-tpl-hd"><span class="yield-tpl-name">'+esc(tpl.name)+'</span>'+
+      '<span class="yield-tpl-est">estim\u00e9 '+(tpl.estimate||'?')+' min'+(tpl.unit?' \u00b7 '+unitLbl[tpl.unit]:'')+'</span></div>'+
+      userRows+
+    '</div>';
+  });
+  const yieldBlock='<div class="stat-block" style="grid-column:1/-1;"><h3>\ud83c\udfaf Rendements par type de t\u00e2che</h3>'+
+    (yieldHtml||'<div style="color:var(--tx4);font-size:13px;padding:14px 0;text-align:center;">Aucune t\u00e2che termin\u00e9e cr\u00e9\u00e9e depuis un mod\u00e8le avec quantit\u00e9. Cr\u00e9ez des t\u00e2ches depuis vos mod\u00e8les et renseignez les quantit\u00e9s pour voir les rendements.</div>')+
+  '</div>';
+
+  // Performance équipe : réel vs estimé sur tâches terminées
+  let perfRows='';
+  S.users.filter(u=>u.role!=='disabled').forEach(u=>{
+    const ut=doneT.filter(t=>t.assignees&&t.assignees.includes(u.id)&&t.estimate>0);
+    if(!ut.length)return;
+    const estMin=ut.reduce((a,t)=>a+(t.estimate||0),0);
+    const realMin=ut.reduce((a,t)=>a+(t.elapsed||0),0)/60;
+    const ratio=estMin>0?Math.round(realMin/estMin*100):0;
+    const color=ratio<=100?'var(--ok)':(ratio<=120?'var(--warn)':'var(--urgent)');
+    const verdict=ratio<=90?'\u26a1 rapide':(ratio<=110?'\u2713 dans les temps':(ratio<=130?'\u26a0 un peu lent':'\ud83d\udc0c besoin d\'aide'));
+    perfRows+='<div class="perf-row">'+
+      '<div class="perf-u"><span class="kc-av" style="background:'+u.color+'">'+u.initials+'</span>'+esc(u.name.split(' ')[0])+'</div>'+
+      '<div class="perf-bar-wrap"><div class="perf-bar" style="width:'+Math.min(ratio,200)/2+'%;background:'+color+'"></div></div>'+
+      '<div class="perf-val" style="color:'+color+'"><b>'+ratio+'%</b> <span style="font-size:10px;color:var(--tx3);">'+verdict+'</span></div>'+
+    '</div>'+
+    '<div class="perf-detail">estim\u00e9 '+fmt(estMin*60)+' \u00b7 r\u00e9el '+fmt(Math.round(realMin*60))+' \u00b7 '+ut.length+' t\u00e2che'+(ut.length>1?'s':'')+'</div>';
+  });
+  const perfBlock='<div class="stat-block" style="grid-column:1/-1;"><h3>\u26a1 Performance \u00e9quipe (r\u00e9el vs estim\u00e9)</h3>'+
+    (perfRows||'<div style="color:var(--tx4);font-size:13px;padding:14px 0;text-align:center;">Pas encore de t\u00e2ches termin\u00e9es avec estimation. Les comparaisons appara\u00eetront ici.</div>')+
+    '<div style="font-size:10px;color:var(--tx4);margin-top:8px;">100% = pile dans le temps estim\u00e9 \u00b7 moins = plus rapide \u00b7 plus = plus lent</div>'+
+  '</div>';
+
+  grid.innerHTML=projChart+yieldBlock+perfBlock+blocks.map(b=>{
     if(b.chart){
       return `<div class="stat-block">
         <h3>${b.title}</h3>
@@ -2771,6 +2927,11 @@ function openNewTask(){
   document.getElementById('moTaskTitle').textContent='Nouvelle tâche';
   document.getElementById('mt-n').value='';
   document.getElementById('mt-est').value='';
+  document.getElementById('mt-qty').value='';
+  document.getElementById('mt-unit').value='';
+  document.getElementById('mt-tplId').value='';
+  document.getElementById('mt-tplsearch').value='';
+  const dd=document.getElementById('tplDropdown');if(dd)dd.style.display='none';
   document.getElementById('mt-notes').value='';
   document.getElementById('mt-dstart').value='';
   document.getElementById('mt-dend').value='';
@@ -2807,6 +2968,7 @@ function openNewTask(){
       scopeNote.style.display='none';
     }
   }
+  applyTaskFieldPerms();
   openModal('moTask');
   setTimeout(()=>document.getElementById('mt-n').focus(),80);
 }
@@ -2822,6 +2984,11 @@ function openEditTask(id){
   document.getElementById('moTaskTitle').textContent='Modifier la tâche';
   document.getElementById('mt-n').value=t.name;
   document.getElementById('mt-est').value=t.estimate||'';
+  document.getElementById('mt-qty').value=t.quantity||'';
+  document.getElementById('mt-unit').value=t.unit||'';
+  document.getElementById('mt-tplId').value=t.templateId||'';
+  document.getElementById('mt-tplsearch').value='';
+  const ddE=document.getElementById('tplDropdown');if(ddE)ddE.style.display='none';
   document.getElementById('mt-notes').value=t.notes||'';
   document.getElementById('mt-dstart').value=t.dateStart||'';
   document.getElementById('mt-dend').value=t.dateEnd||'';
@@ -2842,6 +3009,7 @@ function openEditTask(id){
       scopeNoteE.style.display='none';
     }
   }
+  applyTaskFieldPerms();
   openModal('moTask');
 }
 function renderPolePicker(selected){
@@ -2908,6 +3076,163 @@ function getSelectedUsers(){
     .map(el=>el.dataset.uid)
     .filter(Boolean);
 }
+// ═══ MODÈLES DE TÂCHES ═══
+const UNITS=[{id:'',label:'\u2014'},{id:'ml',label:'ml'},{id:'m2',label:'m\u00b2'},{id:'u',label:'unit\u00e9'},{id:'h',label:'heure'}];
+function unitLabel(u){const x=UNITS.find(z=>z.id===u);return x?x.label:'';}
+
+function renderTemplates(){
+  const list=document.getElementById('tplList');
+  if(!list)return;
+  const tpls=(S.templates||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
+  if(!tpls.length){
+    list.innerHTML='<div style="text-align:center;color:var(--tx4);padding:24px;font-size:13px;">Aucun mod\u00e8le. Cr\u00e9ez-en un ci-dessus pour gagner du temps sur vos t\u00e2ches r\u00e9p\u00e9titives.</div>';
+    return;
+  }
+  list.innerHTML=tpls.map(t=>{
+    const pole=POLES.find(p=>p.id===t.pole);
+    return '<div class="tpl-row">'+
+      '<div class="tpl-info">'+
+        '<div class="tpl-name">'+esc(t.name)+'</div>'+
+        '<div class="tpl-meta">'+
+          (t.estimate?'\u23f1 '+t.estimate+' min':'')+
+          (t.unit?' \u00b7 '+unitLabel(t.unit):'')+
+          (pole?' \u00b7 '+pole.ico+' '+esc(pole.label):'')+
+        '</div>'+
+      '</div>'+
+      '<div class="tpl-acts">'+
+        '<button class="tlc-btn" onclick="editTemplate(\''+t.id+'\')" title="Modifier">\u270e</button>'+
+        '<button class="tlc-btn del" onclick="deleteTemplate(\''+t.id+'\')" title="Supprimer">\u00d7</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+// Permissions sur les champs de la tâche (employés : temps/quantité verrouillés, pas de gestion modèles)
+function applyTaskFieldPerms(){
+  const isAdm=CU&&(CU.role==='admin'||CU.role==='manager');
+  const fromTemplate=!!(document.getElementById('mt-tplId')&&document.getElementById('mt-tplId').value);
+  // Quantité : TOUJOURS modifiable (donnée terrain saisie par l'employé)
+  const qtyEl=document.getElementById('mt-qty');
+  if(qtyEl){ qtyEl.disabled=false; qtyEl.style.opacity=''; qtyEl.style.cursor=''; }
+  // Temps estimé + unité : verrouillés pour l'employé UNIQUEMENT si la tâche part d'un modèle
+  const lockStd=!isAdm&&fromTemplate;
+  ['mt-est','mt-unit'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){ el.disabled=lockStd; el.style.opacity=lockStd?'0.55':''; el.style.cursor=lockStd?'not-allowed':''; }
+  });
+  // Lien "gérer les modèles" : admin/manager uniquement
+  const link=document.getElementById('tplManageLink');
+  if(link) link.style.display=isAdm?'':'none';
+  // Note explicative (seulement quand le temps est verrouillé par un modèle)
+  const note=document.getElementById('mt-perm-note');
+  if(note){
+    note.style.display=lockStd?'block':'none';
+    note.innerHTML='\ud83d\udd12 Temps et unit\u00e9 d\u00e9finis par le mod\u00e8le \u2014 vous pouvez saisir la quantit\u00e9.';
+  }
+}
+
+function openTemplateManager(){
+  const isAdm=CU&&(CU.role==='admin'||CU.role==='manager');
+  if(!isAdm){ toast('\ud83d\udd12 R\u00e9serv\u00e9 aux administrateurs et managers','w'); return; }
+  // Remplir le select pôle du formulaire modèle
+  const sel=document.getElementById('tpl-pole');
+  if(sel) sel.innerHTML='<option value="">\u2014 Aucun \u2014</option>'+POLES.map(p=>'<option value="'+p.id+'">'+p.ico+' '+esc(p.label)+'</option>').join('');
+  const usel=document.getElementById('tpl-unit');
+  if(usel) usel.innerHTML=UNITS.map(u=>'<option value="'+u.id+'">'+u.label+'</option>').join('');
+  resetTemplateForm();
+  renderTemplates();
+  openModal('moTemplates');
+}
+
+function resetTemplateForm(){
+  document.getElementById('tpl-editId').value='';
+  document.getElementById('tpl-name').value='';
+  document.getElementById('tpl-est').value='';
+  document.getElementById('tpl-unit').value='';
+  document.getElementById('tpl-pole').value='';
+  document.getElementById('tpl-notes').value='';
+  document.getElementById('tplFormBtn').textContent='+ Ajouter le mod\u00e8le';
+}
+
+function saveTemplate(){
+  const name=document.getElementById('tpl-name').value.trim();
+  if(!name){toast('Entrez un nom de mod\u00e8le','e');return;}
+  const editId=document.getElementById('tpl-editId').value;
+  const data={
+    name,
+    estimate:parseInt(document.getElementById('tpl-est').value)||0,
+    unit:document.getElementById('tpl-unit').value,
+    pole:document.getElementById('tpl-pole').value,
+    notes:document.getElementById('tpl-notes').value.trim(),
+  };
+  if(editId){
+    const t=S.templates.find(x=>x.id===editId);
+    if(t)Object.assign(t,data);
+    toast('\u2713 Mod\u00e8le mis \u00e0 jour','s');
+  }else{
+    if(!S.templates)S.templates=[];
+    S.templates.push({id:'tpl'+Date.now(),...data,createdAt:Date.now()});
+    toast('\u2713 Mod\u00e8le ajout\u00e9','s');
+  }
+  resetTemplateForm();
+  save();renderTemplates();syncNow();
+}
+
+function editTemplate(id){
+  const t=S.templates.find(x=>x.id===id);if(!t)return;
+  document.getElementById('tpl-editId').value=t.id;
+  document.getElementById('tpl-name').value=t.name;
+  document.getElementById('tpl-est').value=t.estimate||'';
+  document.getElementById('tpl-unit').value=t.unit||'';
+  document.getElementById('tpl-pole').value=t.pole||'';
+  document.getElementById('tpl-notes').value=t.notes||'';
+  document.getElementById('tplFormBtn').textContent='\u2713 Enregistrer les modifications';
+}
+
+function deleteTemplate(id){
+  if(!S.templates)return;
+  S.templates=S.templates.filter(x=>x.id!==id);
+  save();renderTemplates();syncNow();toast('Mod\u00e8le supprim\u00e9','i');
+}
+
+// Recherche & préremplissage depuis un modèle (dans le modal tâche)
+function filterTemplates(q){
+  const dd=document.getElementById('tplDropdown');
+  if(!dd)return;
+  q=(q||'').toLowerCase().trim();
+  const tpls=(S.templates||[]).filter(t=>!q||t.name.toLowerCase().includes(q)).slice(0,8);
+  if(!tpls.length){
+    dd.innerHTML=q?'<div class="tpl-opt-empty">Aucun mod\u00e8le \u00ab '+esc(q)+' \u00bb \u2014 <span onclick="openTemplateManager()" style="color:var(--brand);cursor:pointer;">en cr\u00e9er un</span></div>':'';
+    dd.style.display=q?'block':'none';
+    return;
+  }
+  dd.innerHTML=tpls.map(t=>{
+    const pole=POLES.find(p=>p.id===t.pole);
+    return '<div class="tpl-opt" onclick="applyTemplate(\''+t.id+'\')">'+
+      '<span class="tpl-opt-name">'+esc(t.name)+'</span>'+
+      '<span class="tpl-opt-meta">'+(t.estimate?t.estimate+' min':'')+(t.unit?' \u00b7 '+unitLabel(t.unit):'')+(pole?' \u00b7 '+pole.ico:'')+'</span>'+
+    '</div>';
+  }).join('');
+  dd.style.display='block';
+}
+
+function applyTemplate(id){
+  const t=S.templates.find(x=>x.id===id);if(!t)return;
+  document.getElementById('mt-n').value=t.name;
+  if(t.estimate)document.getElementById('mt-est').value=t.estimate;
+  if(t.notes)document.getElementById('mt-notes').value=t.notes;
+  document.getElementById('mt-unit').value=t.unit||'';
+  document.getElementById('mt-tplId').value=t.id;
+  // Pré-sélectionner le pôle
+  if(t.pole){ renderPolePicker(t.pole); }
+  // Fermer le dropdown + vider la recherche
+  document.getElementById('tplDropdown').style.display='none';
+  document.getElementById('mt-tplsearch').value='';
+  // Ré-appliquer les permissions (verrouille temps/unité pour l'employé quand un modèle est appliqué)
+  applyTaskFieldPerms();
+  toast('\ud83d\udccb Mod\u00e8le \u00ab '+t.name+' \u00bb appliqu\u00e9','s');
+}
+
 function saveTask(){
   const name=document.getElementById('mt-n').value.trim();
   if(!name){toast('Entrez un nom','e');return;}
@@ -2940,10 +3265,10 @@ function saveTask(){
   const assignees=getSelectedUsers();
   if(editId){
     const t=S.tasks.find(x=>x.id===editId);
-    if(t){Object.assign(t,{name,project:document.getElementById('mt-proj').value,priority:document.getElementById('mt-prio').value,pole,assignees:Array.isArray(assignees)?assignees:[],estimate:parseInt(document.getElementById('mt-est').value)||0,notes:document.getElementById('mt-notes').value.trim(),dateStart:document.getElementById('mt-dstart').value,dateEnd:document.getElementById('mt-dend').value});}
+    if(t){Object.assign(t,{name,project:document.getElementById('mt-proj').value,priority:document.getElementById('mt-prio').value,pole,assignees:Array.isArray(assignees)?assignees:[],estimate:parseInt(document.getElementById('mt-est').value)||0,quantity:parseFloat(document.getElementById('mt-qty').value)||0,unit:document.getElementById('mt-unit').value||'',templateId:document.getElementById('mt-tplId').value||t.templateId||'',notes:document.getElementById('mt-notes').value.trim(),dateStart:document.getElementById('mt-dstart').value,dateEnd:document.getElementById('mt-dend').value});}
     toast('✓ Tâche mise à jour','s');
   }else{
-    const newTask={id:'t'+Date.now(),name,project:document.getElementById('mt-proj').value,priority:document.getElementById('mt-prio').value,pole,assignees,estimate:parseInt(document.getElementById('mt-est').value)||0,notes:document.getElementById('mt-notes').value.trim(),dateStart:document.getElementById('mt-dstart').value,dateEnd:document.getElementById('mt-dend').value,elapsed:0,timerRunning:false,done:false,archived:false,deleted:false,status:'todo',createdAt:Date.now(),createdBy:CU?CU.id:''};
+    const newTask={id:'t'+Date.now(),name,project:document.getElementById('mt-proj').value,priority:document.getElementById('mt-prio').value,pole,assignees,estimate:parseInt(document.getElementById('mt-est').value)||0,quantity:parseFloat(document.getElementById('mt-qty').value)||0,unit:document.getElementById('mt-unit').value||'',templateId:document.getElementById('mt-tplId').value||'',notes:document.getElementById('mt-notes').value.trim(),dateStart:document.getElementById('mt-dstart').value,dateEnd:document.getElementById('mt-dend').value,elapsed:0,timerRunning:false,done:false,archived:false,deleted:false,status:'todo',createdAt:Date.now(),createdBy:CU?CU.id:''};
     S.tasks.push(newTask);
     if(assignees.length)addNotif('Nouvelle tâche','Vous avez été assigné à "'+name+'"','i');
     toast('✓ Tâche "'+name+'" créée — assignée à '+assignees.length+' pers.','s');
@@ -3068,6 +3393,7 @@ async function expSheets(url, silent=false){
       action:'sync',
       projects:S.projects,
       tasks:S.tasks,
+      templates:S.templates,
       users:S.users.map(u=>{const uu={...u};delete uu.pin;return uu;}),
       tsec:S.tsec,
       ts:ts
@@ -3156,7 +3482,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.3';
+const APP_VERSION = '5.7';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
@@ -3230,6 +3556,14 @@ renderColorPicker(AVATAR_COLORS[0]);
   renderLogin(); // Aucune session valide → écran de connexion
   updateFavicon();
 })();
+
+
+// Fermer le dropdown de modèles au clic extérieur
+document.addEventListener('click',function(e){
+  const wrap=document.querySelector('.tpl-search-wrap');
+  const dd=document.getElementById('tplDropdown');
+  if(dd&&wrap&&!wrap.contains(e.target)){dd.style.display='none';}
+});
 
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
