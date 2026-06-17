@@ -501,36 +501,187 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 
 
 
-/* KANBAN */
+
+/* KPI cliquables */
+.kpi-card.kpi-clickable{cursor:pointer;}
+.kpi-card.kpi-clickable:hover{border-color:var(--kpi-color,var(--brand));transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.15);}
+.kpi-card.kpi-clickable:hover .kpi-ico{transform:scale(1.1);}
+.kpi-ico{transition:transform var(--tr);}
+/* Temps : taille réduite et adaptative pour ne pas déborder */
+.kpi-val-time{font-size:20px !important;letter-spacing:0;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:visible;}
+
+/* ═══ TÂCHES VUE LIGNE COMPACTE ═══ */
+.tlc{
+  display:flex;align-items:center;gap:10px;
+  background:var(--sf);border:1px solid var(--bd);
+  border-left:3px solid var(--ok);border-radius:var(--rs);
+  padding:7px 12px;transition:background var(--tr),border-color var(--tr);
+}
+.tlc:hover{background:var(--ch);border-color:var(--bd2);}
+.tlc.urg{border-left-color:var(--urgent);}
+.tlc.done{opacity:.5;}
+.tlc.done .tlc-name{text-decoration:line-through;color:var(--tx3);}
+.tlc.run{border-left-color:var(--brand);background:var(--brand-xs);}
+.tlc.ro{opacity:.65;border-left-style:dashed;}
+/* Checkbox */
+.tlc-ck{width:18px;height:18px;border:2px solid var(--bd2);border-radius:5px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all var(--tr);}
+.tlc-ck:hover{border-color:var(--brand);}
+.tlc-ck.on{background:var(--brand);border-color:var(--brand);}
+.tlc-ck.on::after{content:"✓";font-size:10px;color:#fff;font-weight:700;}
+/* Nom (flex, tronqué) */
+.tlc-main{flex:1;min-width:0;cursor:pointer;display:flex;align-items:center;}
+.tlc-name{font-size:13px;font-weight:400;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;width:100%;}
+.tlc-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--urgent);margin-right:6px;vertical-align:middle;}
+/* Meta (projet, avatars, temps) */
+.tlc-meta{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.tlc-proj{font-size:11px;color:var(--brand-d);background:var(--brand-xs);padding:2px 8px;border-radius:10px;white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis;}
+.tlc-av{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;flex-shrink:0;margin-left:-4px;border:1.5px solid var(--sf);}
+.tlc-av:first-child{margin-left:0;}
+.tlc-more{font-size:10px;color:var(--tx3);margin-left:2px;}
+.tlc-time{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--tx3);min-width:54px;text-align:right;font-variant-numeric:tabular-nums;}
+.tlc.run .tlc-time{color:var(--brand);}
+/* Actions */
+.tlc-actions{display:flex;align-items:center;gap:3px;flex-shrink:0;}
+.tlc-btn{width:26px;height:26px;border-radius:5px;border:1px solid var(--bd2);background:var(--sf2);color:var(--tx3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all var(--tr);padding:0;}
+.tlc-btn:hover{background:var(--sf3);color:var(--tx);}
+.tlc-btn.play{color:var(--ok);border-color:var(--ob);}
+.tlc-btn.play:hover{background:var(--obg);}
+.tlc-btn.stop{color:var(--urgent);border-color:var(--ub);}
+.tlc-btn.del:hover{color:var(--urgent);background:var(--ubg);border-color:var(--ub);}
+/* Mobile : masquer projet et réduire */
+@media(max-width:600px){
+  .tlc-time{min-width:46px;font-size:10px;}
+  .tlc-btn{width:24px;height:24px;}
+}
+
+/* Drag & drop réordonnancement tâches */
+.tlc-grip{color:var(--tx4);font-size:15px;cursor:grab;flex-shrink:0;opacity:.25;transition:opacity var(--tr),color var(--tr);user-select:none;line-height:1;letter-spacing:-2px;width:12px;text-align:center;}
+.tlc:hover .tlc-grip{opacity:.6;}
+.tlc-grip:hover{opacity:1 !important;color:var(--brand);}
+.tlc-grip:active{cursor:grabbing;}
+.tlc-dragging{opacity:.4;border-style:dashed;}
+.tlc-drop-above{box-shadow:0 -3px 0 -1px var(--brand);}
+.tlc-drop-below{box-shadow:0 3px 0 -1px var(--brand);}
+/* Mobile : grip toujours visible pour faciliter le touch */
+@media(max-width:600px){
+  .tlc-grip{opacity:.4;}
+}
+
+/* ═══════════ KANBAN ═══════════ */
 #pg-kanban{padding:12px 14px;box-sizing:border-box;}
-.kb-col{flex:0 0 220px;min-width:220px;height:100%;display:flex;flex-direction:column;background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;}
-.kb-col-hd{padding:10px 12px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.kb-col-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--tx2);display:flex;align-items:center;gap:7px;}
+#kanbanWrap{overflow:auto;border:1px solid var(--bd);border-radius:var(--r);}
+#kanbanWrap::-webkit-scrollbar{height:7px;width:7px;}
+#kanbanWrap::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:4px;}
+
+/* ─── Vue colonnes (utilisateur normal) ─── */
+.kanban-board{display:flex;flex-direction:row;flex-wrap:nowrap;gap:8px;height:100%;padding:8px;}
+.kanban-board.swim-mode{display:block;padding:0;}
+.kb-col{flex:1 1 0;min-width:160px;max-width:340px;display:flex;flex-direction:column;background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;}
+.kb-col-hd{padding:9px 11px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.kb-col-title{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--tx2);display:flex;align-items:center;gap:6px;}
 .kb-col-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .kb-count{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--tx3);background:var(--sf3);padding:1px 7px;border-radius:10px;}
 .kb-cards{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:6px;display:flex;flex-direction:column;gap:5px;}
 .kb-cards::-webkit-scrollbar{width:3px;}
 .kb-cards::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
-.kb-card{background:var(--sf2);border:1px solid var(--bd);border-radius:var(--rs);border-left:3px solid var(--card-color,var(--bd2));padding:10px 11px;cursor:grab;flex-shrink:0;}
-.kb-card:hover{background:var(--sf3);}
-.kb-card.dragging{opacity:.5;transform:rotate(2deg);}
-.kb-card.kb-readonly{opacity:.75;cursor:default;}
-.kb-col.drag-over-col{border-color:var(--brand);}
-.kb-user-chip{display:flex;align-items:center;gap:5px;padding:4px 10px 4px 5px;border-radius:20px;border:2px solid var(--bd2);background:var(--sf2);cursor:pointer;font-size:12px;color:var(--tx3);user-select:none;}
-.kb-user-chip.sel{border-color:var(--brand);background:var(--brand-xs);color:var(--tx);}
-.kb-user-chip .av{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0;}
-.kc-name{font-size:13px;font-weight:500;color:var(--tx);margin-bottom:5px;line-height:1.3;word-break:break-word;}
-.kc-meta{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:5px;}
-.kc-bottom{display:flex;align-items:center;justify-content:space-between;gap:4px;}
-.kc-user{display:flex;align-items:center;gap:3px;}
-.kc-avatar{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;flex-shrink:0;}
-.kc-uname{font-size:11px;color:var(--tx3);}
-.kc-time{font-size:10px;color:var(--tx3);font-family:'JetBrains Mono',monospace;}
+.kb-col.drag-over-col{border-color:var(--brand);box-shadow:inset 0 0 0 1px var(--brand);}
+.kb-empty{font-size:11px;color:var(--tx4);text-align:center;padding:14px 0;}
 
-#kanbanWrap{overflow-x:auto;overflow-y:hidden;}
-#kanbanWrap::-webkit-scrollbar{height:6px;}
-#kanbanWrap::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
-.kanban-board{display:flex;flex-direction:row;flex-wrap:nowrap;gap:8px;height:100%;padding-bottom:6px;}
+/* ─── Carte simplifiée (nom + projet + avatars) ─── */
+.kb-card{background:var(--sf2);border:1px solid var(--bd);border-left:3px solid var(--bd2);border-radius:var(--rs);padding:8px 10px;cursor:grab;flex-shrink:0;transition:background var(--tr),border-color var(--tr);}
+.kb-card:hover{background:var(--sf3);}
+.kb-card.urg{border-left-color:var(--urgent);}
+.kb-card.dragging{opacity:.4;}
+.kb-card.kb-readonly{opacity:.7;cursor:default;border-left-style:dashed;}
+.kc-name{font-size:12px;font-weight:400;color:var(--tx);line-height:1.3;word-break:break-word;}
+.kc-foot{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:6px;}
+.kc-proj{font-size:10px;color:var(--brand-d);background:var(--brand-xs);padding:2px 7px;border-radius:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;}
+.kc-avatars{display:flex;flex-shrink:0;}
+.kc-av{width:19px;height:19px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;flex-shrink:0;margin-left:-4px;border:1.5px solid var(--sf2);}
+.kc-av:first-child{margin-left:0;}
+.kc-more{font-size:9px;color:var(--tx3);margin-left:2px;align-self:center;}
+
+/* ─── Swim lane (admin) ─── */
+.swim{display:grid;width:100%;min-width:680px;}
+.swimHead{display:grid;grid-template-columns:46px repeat(var(--ncols),minmax(150px,1fr));position:sticky;top:0;z-index:3;background:var(--sf);border-bottom:1px solid var(--bd);}
+.swim-cell{padding:10px 12px;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--tx2);display:flex;align-items:center;gap:6px;border-right:1px solid var(--bd);}
+.swim-cell:first-child{position:sticky;left:0;background:var(--sf);z-index:4;justify-content:center;padding:10px 4px;}
+.swimRow{display:grid;grid-template-columns:46px repeat(var(--ncols),minmax(150px,1fr));border-bottom:1px solid var(--bd);}
+.swimRow:last-child{border-bottom:none;}
+.swim-userCell{position:sticky;left:0;background:var(--sf2);z-index:2;padding:8px 4px;display:flex;align-items:center;justify-content:center;border-right:1px solid var(--bd);}
+.swim-uname{font-weight:500;}
+.swim-statCell{padding:6px;border-right:1px solid var(--bd);min-height:72px;transition:background var(--tr);display:flex;flex-direction:column;gap:5px;}
+.swim-statCell:last-child{border-right:none;}
+.swim-statCell.drop-target{background:var(--brand-xs);box-shadow:inset 0 0 0 2px var(--brand);}
+
+/* ─── Responsive Kanban ─── */
+@media(max-width:600px){
+  .swimHead{grid-template-columns:40px repeat(var(--ncols),minmax(88px,1fr));}
+  .swimRow{grid-template-columns:40px repeat(var(--ncols),minmax(88px,1fr));}
+  .swim-userCell{padding:6px 3px;}
+  .swim-uname{font-size:9px;line-height:1.1;}
+  .swim-cell{padding:6px 4px;font-size:10px;}
+  .swim-cell:first-child{font-size:9px;}
+  .kb-col-dot{width:6px;height:6px;}
+  .kb-card{padding:6px 7px;}
+  .kc-name{font-size:11px;}
+  .kc-proj{font-size:9px;max-width:90px;}
+  .swim-statCell{padding:4px;min-height:60px;}
+  .swim{min-width:420px;}
+  .kb-col{min-width:130px;}
+}
+@media(max-width:400px){
+  .swimHead{grid-template-columns:36px repeat(var(--ncols),minmax(78px,1fr));}
+  .swimRow{grid-template-columns:36px repeat(var(--ncols),minmax(78px,1fr));}
+  .swim{min-width:370px;}
+}
+
+/* Mini chip projet (dashboard) */
+.mini-proj{font-size:9px;color:var(--brand-d);background:var(--brand-xs);padding:1px 6px;border-radius:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;}
+/* Optimisation mobile vue ligne : projet visible, compact */
+@media(max-width:600px){
+  .tlc{gap:7px;padding:6px 9px;}
+  .tlc-grip{display:none;}
+  .tlc-proj{display:inline-block;font-size:9px;padding:1px 6px;max-width:72px;}
+  .tlc-meta{gap:5px;}
+  .tlc-time{display:none;}
+  .tlc-av{width:18px;height:18px;}
+}
+@media(max-width:400px){
+  .tlc-proj{max-width:56px;}
+  .tlc-actions .tlc-btn:not(.play):not(.stop):not(.del){display:none;}
+}
+
+/* Avatar rond (dashboard) */
+.kc-avatar{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;flex-shrink:0;}
+
+/* ═══ DOSSIERS PROJETS ═══ */
+.breadcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:2px;margin-bottom:16px;font-size:13px;}
+.crumb-item{color:var(--tx3);cursor:pointer;padding:3px 8px;border-radius:6px;transition:all var(--tr);white-space:nowrap;}
+.crumb-item:hover{background:var(--sf2);color:var(--tx);}
+.crumb-item.active{color:var(--tx);font-weight:600;}
+.crumb-sep{color:var(--tx4);font-size:14px;padding:0 1px;}
+/* Carte dossier */
+.folder-card{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:16px;cursor:pointer;transition:all var(--tr);display:flex;flex-direction:column;gap:8px;min-height:120px;}
+.folder-card:hover{border-color:var(--brand);transform:translateY(-2px);box-shadow:var(--sh);}
+.fc-top{display:flex;align-items:flex-start;justify-content:space-between;}
+.fc-ico{font-size:34px;line-height:1;}
+.fc-acts{display:flex;gap:3px;opacity:0;transition:opacity var(--tr);}
+.folder-card:hover .fc-acts{opacity:1;}
+.fc-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--tx);word-break:break-word;}
+.fc-info{font-size:11px;color:var(--tx3);font-family:'JetBrains Mono',monospace;margin-top:auto;}
+/* Liste de déplacement */
+.move-list{max-height:300px;overflow-y:auto;margin:8px 0;border:1px solid var(--bd);border-radius:var(--rs);}
+.move-opt{padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--tx2);border-bottom:1px solid var(--bd);transition:background var(--tr);}
+.move-opt:last-child{border-bottom:none;}
+.move-opt:hover{background:var(--brand-xs);color:var(--tx);}
+.move-opt span{font-size:15px;}
+
+/* Drag & drop dossiers/projets */
+.folder-card[draggable],.pc[draggable]{cursor:grab;}
+.proj-dragging{opacity:.4;transform:scale(.97);}
+.proj-drop-target{border-color:var(--brand) !important;background:var(--brand-xs) !important;box-shadow:0 0 0 2px var(--brand) inset;transform:scale(1.02);}
+.crumb-item.crumb-drop{background:var(--brand);color:#fff;box-shadow:0 0 0 2px var(--brand);}
 </style>
 </head>
 <body>
@@ -642,8 +793,12 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   <div class="page" id="pg-projects">
     <div class="pgh">
       <div><div class="pgt">Projets</div><div class="pgs" id="sub-projects">—</div></div>
-      <div class="pga"><button class="btn pri sm" onclick="openModal('moProject')">+ Projet</button></div>
+      <div class="pga">
+        <button class="btn sm" onclick="openModal('moFolder')">+ Dossier</button>
+        <button class="btn pri sm" onclick="openModal('moProject')">+ Projet</button>
+      </div>
     </div>
+    <div class="breadcrumb" id="projBreadcrumb"></div>
     <div class="pgrid" id="projGrid"></div>
   </div>
 
@@ -690,6 +845,12 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   <div class="page" id="pg-urgent">
     <div class="pgh"><div><div class="pgt">🔴 Urgentes</div><div class="pgs">Priorité haute — tous pôles</div></div></div>
     <div class="tl" id="urgentList"></div>
+  </div>
+
+  <!-- ── TÂCHES TERMINÉES ── -->
+  <div class="page" id="pg-done">
+    <div class="pgh"><div><div class="pgt">✅ Tâches terminées</div><div class="pgs" id="done-sub">Historique des tâches accomplies</div></div></div>
+    <div class="tl" id="doneList"></div>
   </div>
 
   <!-- ── POLES (template dynamique) ── -->
@@ -782,6 +943,24 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     </div>
     <div class="fg"><label class="fl">Notes</label><textarea class="fta" id="mp-notes" placeholder="Description du projet..."></textarea></div>
     <div class="ma"><button class="btn" onclick="closeModal('moProject')">Annuler</button><button class="btn pri" onclick="saveProject()">Créer</button></div>
+  </div>
+</div>
+
+<!-- Modal Dossier -->
+<div class="mo" id="moFolder">
+  <div class="mbox">
+    <div class="mt">Nouveau dossier</div>
+    <div class="fg"><label class="fl">Nom du dossier *</label><input type="text" class="fi" id="mf-n" placeholder="Ex: M. et Mme Dupont"/></div>
+    <div class="ma"><button class="btn" onclick="closeModal('moFolder')">Annuler</button><button class="btn pri" onclick="saveFolder()">Créer le dossier</button></div>
+  </div>
+</div>
+
+<!-- Modal Déplacer -->
+<div class="mo" id="moMove">
+  <div class="mbox">
+    <div class="mt">Déplacer vers…</div>
+    <div class="move-list" id="moveList"></div>
+    <div class="ma"><button class="btn" onclick="closeModal('moMove')">Annuler</button></div>
   </div>
 </div>
 
@@ -959,6 +1138,7 @@ function load(){
       tsec:d.tsec||0,surl:d.surl||DEFAULT_SURL||'',theme:d.theme||'dark',
       sidebarOpen:d.sidebarOpen!==undefined?d.sidebarOpen:true,
     });
+    S.curFolder=null;
     S.tasks.forEach(t=>t.timerRunning=false);
     // URL : fallback sur DEFAULT_SURL si rien en local
   if(!S.surl&&DEFAULT_SURL) S.surl=DEFAULT_SURL;
@@ -1017,7 +1197,12 @@ function startTimer(id){
   if(!CU)return;
   const canTimer=CU.role==='admin'||CU.role==='manager'||(t.assignees&&t.assignees.includes(CU.id))||(t.createdBy&&t.createdBy===CU.id);
   if(!canTimer){toast('🔒 Seuls les utilisateurs assignés peuvent démarrer le chrono','w');return;}
-  S.tasks.forEach(x=>{if(x.timerRunning&&x.id!==id)stopTimer(x.id);});
+  // Un seul timer actif PAR UTILISATEUR : on stoppe uniquement les autres tâches
+  // partageant un assigné avec celle qu'on démarre (les tâches des autres continuent)
+  const _tUsers=t.assignees||[];
+  S.tasks.forEach(x=>{
+    if(x.timerRunning&&x.id!==id&&x.assignees&&x.assignees.some(a=>_tUsers.includes(a)))stopTimer(x.id);
+  });
   t.timerRunning=true;t.timerStart=Date.now();
   if(t.status==='todo'){t.status='inprogress';}
   ivs[id]=setInterval(()=>{
@@ -1333,7 +1518,7 @@ function goPage(p){
   const navEl=document.getElementById('nav-'+p)||document.getElementById('nav-'+p.split('-')[0]+'-'+p.split('-')[1]);
   if(navEl)navEl.classList.add('act');
   // Breadcrumb
-  const labels={dashboard:'Dashboard',kanban:'Kanban',projects:'Projets',all:'Toutes les tâches','my-tasks':'Mes tâches',urgent:'Urgentes',stats:'Statistiques',archive:'Archives',admin:'Administration',
+  const labels={dashboard:'Dashboard',kanban:'Kanban',projects:'Projets',all:'Toutes les tâches','my-tasks':'Mes tâches',urgent:'Urgentes',done:'Tâches terminées',stats:'Statistiques',archive:'Archives',admin:'Administration',
     'pole-arch':'Architecture','pole-compta':'Comptabilité','pole-marketing':'Marketing','pole-gestion':'Gestion','pole-atelier':'Atelier','pole-commercial':'Commercial'};
   document.getElementById('bc').innerHTML=`<span class="cur">${labels[p]||p}</span>`;
   renderPage(p);
@@ -1346,6 +1531,7 @@ function renderPage(p){
   else if(p==='all')renderAllTasks();
   else if(p==='my-tasks')renderMyTasks();
   else if(p==='urgent')renderUrgentPage();
+  else if(p==='done')renderDonePage();
   else if(p==='stats')renderStats();
   else if(p==='archive')renderArchive();
   else if(p==='admin')renderAdmin();
@@ -1394,29 +1580,37 @@ function renderDashboard(){
   document.getElementById('dash-title').textContent='Bonjour '+name+' 👋';
   document.getElementById('dash-sub').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const kpis=[
-    {ico:'📋',val:active.length,lbl:'Tâches actives',sub:urgent.length+' urgentes',color:'var(--brand)'},
-    {ico:'✅',val:done.length,lbl:'Terminées',sub:'total cumulé',color:'var(--ok)'},
-    {ico:'🔴',val:urgent.length,lbl:'Urgentes',sub:'à traiter',color:'var(--urgent)'},
+    {ico:'📋',val:active.length,lbl:'Tâches actives',sub:urgent.length+' urgentes',color:'var(--brand)',link:'all'},
+    {ico:'✅',val:done.length,lbl:'Terminées',sub:'voir le détail',color:'var(--ok)',link:'done'},
+    {ico:'🔴',val:urgent.length,lbl:'Urgentes',sub:'à traiter',color:'var(--urgent)',link:'urgent'},
     {ico:'⏱',val:running.length>0?'▶ '+running.length:fmt(todayT),lbl:running.length>0?'Timer actif':'Temps aujourd\'hui',sub:'',color:'var(--info)',id:'kpi-time-wrap'},
-    {ico:'🏗',val:S.projects.filter(p=>!p.archived&&!p.deleted).length,lbl:'Projets actifs',sub:'',color:'var(--warn)'},
-    {ico:'👥',val:S.users.filter(u=>u.role!=='disabled').length,lbl:'Utilisateurs',sub:'actifs',color:'var(--arch)'},
+    {ico:'🏗',val:S.projects.filter(p=>!p.archived&&!p.deleted).length,lbl:'Projets actifs',sub:'',color:'var(--warn)',link:'projects'},
+    {ico:'👥',val:S.users.filter(u=>u.role!=='disabled').length,lbl:'Utilisateurs',sub:'actifs',color:'var(--arch)',link:CU&&CU.role==='admin'?'admin':null},
   ];
-  document.getElementById('kpiGrid').innerHTML=kpis.map(k=>`
-    <div class="kpi-card" style="--kpi-color:${k.color}">
-      <div class="kpi-ico">${k.ico}</div>
-      <div class="kpi-val" ${k.id?'id="kpi-time"':''}>${k.val}</div>
-      <div class="kpi-lbl">${k.lbl}</div>
-      ${k.sub?`<div class="kpi-sub">${k.sub}</div>`:''}
-    </div>`).join('');
+  document.getElementById('kpiGrid').innerHTML=kpis.map(k=>{
+    const clickable=k.link?'kpi-clickable':'';
+    const onclick=k.link?'onclick="goPage(\''+k.link+'\')"':'';
+    const valId=k.id?'id="kpi-time"':'';
+    const valClass=k.id?'kpi-val kpi-val-time':'kpi-val';
+    const sub=k.sub?'<div class="kpi-sub">'+k.sub+'</div>':'';
+    return '<div class="kpi-card '+clickable+'" style="--kpi-color:'+k.color+'" '+onclick+'>'+
+      '<div class="kpi-ico">'+k.ico+'</div>'+
+      '<div class="'+valClass+'" '+valId+'>'+k.val+'</div>'+
+      '<div class="kpi-lbl">'+k.lbl+'</div>'+
+      sub+
+    '</div>';
+  }).join('');
   // Recent tasks
   const recent=tasks.filter(t=>!t.deleted).sort((a,b)=>b.createdAt-a.createdAt).slice(0,5);
   document.getElementById('dashRecent').innerHTML=`
     <h3>🕐 Tâches récentes</h3>
     ${recent.map(t=>{
       const u=S.users.find(x=>t.assignees&&t.assignees.includes(x.id));
-      const tName=esc(t.name.slice(0,28))+(t.name.length>28?'…':'');
+      const tName=esc(t.name.slice(0,24))+(t.name.length>24?'…':'');
+      const rProj=S.projects.find(pp=>pp.id===t.project);
+      const rProjHtml=rProj?'<span class="mini-proj" title="'+esc(rProj.name)+'">'+esc(rProj.name.length>12?rProj.name.slice(0,12)+'…':rProj.name)+'</span>':'';
       const uHtml=u?'<span class="kc-avatar" style="background:'+u.color+';width:18px;height:18px;font-size:8px;">'+u.initials+'</span>':'';
-      return '<div class="stat-row2"><span class="sk">'+tName+'</span><span class="sv" style="display:flex;align-items:center;gap:5px;">'+uHtml+(t.done?'✅':'🔄')+'</span></div>';
+      return '<div class="stat-row2"><span class="sk">'+tName+'</span><span class="sv" style="display:flex;align-items:center;gap:5px;">'+rProjHtml+uHtml+(t.done?'✅':'🔄')+'</span></div>';
     }).join('')}
   `;
   // Poles overview
@@ -1444,9 +1638,11 @@ function renderDashboard(){
       const _usHtml=us.map(u=>'<span class="kc-avatar" style="background:'+u.color+';width:18px;height:18px;font-size:8px;">'+u.initials+'</span>').join('');
       const _status=t.done?'✅':(t.priority==='urgent'?'🔴':'🔄');
       const _est=t.estimate?'<span style="font-size:9px;color:var(--tx3);">⏱'+t.estimate+'m</span>':'';
-      return '<div class="stat-row2" style="cursor:pointer;" onclick="openEditTask(\''+ _tId +'\'")>'+
+      const uProj=S.projects.find(pp=>pp.id===t.project);
+      const uProjHtml=uProj?'<span class="mini-proj" title="'+esc(uProj.name)+'">'+esc(uProj.name.length>12?uProj.name.slice(0,12)+'…':uProj.name)+'</span>':'';
+      return '<div class="stat-row2" style="cursor:pointer;" onclick="openEditTask(\''+_tId+'\')">'+
         '<span class="sk">'+_tName+'</span>'+
-        '<span class="sv" style="display:flex;align-items:center;gap:4px;">'+_usHtml+_status+_est+'</span>'+
+        '<span class="sv" style="display:flex;align-items:center;gap:4px;">'+uProjHtml+_usHtml+_status+_est+'</span>'+
       '</div>';
     }).join(''):'<div class="empty"><div class="ei">✅</div><h3>Aucune urgente !</h3></div>'}
   `;
@@ -1472,25 +1668,24 @@ function renderKanban(){
   if(S.cur!=='kanban')return;
   const isAdmin=CU.role==='admin'||CU.role==='manager';
   document.getElementById('kanbanTitle').textContent='Kanban';
-  document.getElementById('kanbanSub').textContent=isAdmin?'Vue équipe complète':'Tâches de '+CU.name.split(' ')[0];
-  document.getElementById('kanbanActions').innerHTML='<button class="btn pri sm" onclick="openNewTask()">+ Tâche</button>';
+  document.getElementById('kanbanSub').textContent=isAdmin?'Vue \u00e9quipe \u2014 toutes les t\u00e2ches par poste':'Mes t\u00e2ches';
+  document.getElementById('kanbanActions').innerHTML='<button class="btn pri sm" onclick="openNewTask()">+ T\u00e2che</button>';
 
   const board=document.getElementById('kanbanBoard');
-  board.innerHTML=STATUSES.map(st=>{
-    let tasks=S.tasks.filter(t=>t.status===st.id&&!t.archived&&!t.deleted);
-    if(!isAdmin) tasks=tasks.filter(t=>t.assignees&&t.assignees.includes(CU.id));
-    const cards=tasks.map(t=>kanbanCard(t)).join('');
-    const empty=tasks.length?'':'<div style="padding:16px;text-align:center;color:var(--tx4);font-size:12px;">Vide</div>';
-    const dOver='ondragover="kanbanDragOver(event,&quot;'+st.id+'&quot;)"';
-    const dDrop='ondrop="kanbanDrop(event,&quot;'+st.id+'&quot;)"';
-    return '<div class="kb-col" id="kbc-'+st.id+'" '+dOver+' '+dDrop+' ondragleave="kanbanDragLeave(event)">'+
-      '<div class="kb-col-hd"><div class="kb-col-title"><div class="kb-col-dot" style="background:'+st.color+'"></div>'+esc(st.label)+'</div>'+
-      '<span class="kb-count">'+tasks.length+'</span></div>'+
-      '<div class="kb-cards" id="kbc-cards-'+st.id+'">'+cards+empty+'</div>'+
-    '</div>';
-  }).join('');
+  // Colonnes de statut (sans "Termin\u00e9" : les t\u00e2ches finies vont dans T\u00e2ches termin\u00e9es)
+  const cols=STATUSES;
 
-  // Hauteur calculée: plusieurs tentatives pour être sûr
+  if(isAdmin){
+    board.className='kanban-board swim-mode';
+    board.style.cssText='display:block;width:100%;';
+    board.innerHTML=renderSwimLane(cols);
+  } else {
+    board.className='kanban-board';
+    board.style.cssText='display:flex;flex-direction:row;flex-wrap:nowrap;gap:8px;height:100%;';
+    board.innerHTML=renderKanbanCols(cols);
+  }
+
+  // Hauteur calcul\u00e9e
   function _setKanbanH(){
     const wrap=document.getElementById('kanbanWrap');
     if(!wrap||S.cur!=='kanban')return;
@@ -1498,7 +1693,6 @@ function renderKanban(){
     const h=window.innerHeight-top-10;
     if(h>100){ wrap.style.height=h+'px'; }
   }
-  // 3 tentatives: immédiate, après rendu, après layout complet
   _setKanbanH();
   requestAnimationFrame(_setKanbanH);
   setTimeout(_setKanbanH,100);
@@ -1507,39 +1701,144 @@ function renderKanban(){
     window.addEventListener('resize',()=>{ if(S.cur==='kanban') _setKanbanH(); });
   }
 }
+
+// Vue colonnes classique (utilisateur normal)
+function renderKanbanCols(cols){
+  return cols.map(st=>{
+    let tasks=S.tasks.filter(t=>t.status===st.id&&!t.done&&!t.archived&&!t.deleted);
+    tasks=tasks.filter(t=>t.assignees&&t.assignees.includes(CU.id));
+    const cards=tasks.map(t=>kanbanCard(t)).join('');
+    const empty=tasks.length?'':'<div class="kb-empty">Vide</div>';
+    return '<div class="kb-col" id="kbc-'+st.id+'" ondragover="kanbanDragOver(event,&quot;'+st.id+'&quot;)" ondrop="kanbanDrop(event,&quot;'+st.id+'&quot;)" ondragleave="kanbanDragLeave(event)">'+
+      '<div class="kb-col-hd"><div class="kb-col-title"><div class="kb-col-dot" style="background:'+st.color+'"></div>'+esc(st.label)+'</div>'+
+      '<span class="kb-count">'+tasks.length+'</span></div>'+
+      '<div class="kb-cards">'+cards+empty+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+// Vue swim lane (admin) : lignes = utilisateurs, colonnes = statuts
+function renderSwimLane(cols){
+  const users=S.users.filter(u=>u.role!=='disabled');
+  let html='<div class="swim" style="--ncols:'+cols.length+'">';
+  // En-t\u00eate
+  html+='<div class="swimHead"><div class="swim-cell swim-user-hd">\ud83d\udc65</div>';
+  cols.forEach(st=>{
+    html+='<div class="swim-cell"><span class="kb-col-dot" style="background:'+st.color+'"></span>'+esc(st.label)+'</div>';
+  });
+  html+='</div>';
+  // Lignes par utilisateur
+  users.forEach(u=>{
+    html+='<div class="swimRow">';
+    html+='<div class="swim-userCell" title="'+esc(u.name)+'"><span class="kc-av" style="background:'+u.color+'">'+u.initials+'</span></div>';
+    cols.forEach(st=>{
+      const cellTasks=S.tasks.filter(t=>t.status===st.id&&!t.done&&!t.archived&&!t.deleted&&t.assignees&&t.assignees.includes(u.id));
+      const cards=cellTasks.map(t=>kanbanCard(t)).join('');
+      html+='<div class="swim-statCell" data-status="'+st.id+'" data-user="'+u.id+'" ondragover="swimDragOver(event,&quot;'+st.id+'&quot;)" ondrop="swimDrop(event,&quot;'+st.id+'&quot;,&quot;'+u.id+'&quot;)" ondragleave="swimDragLeave(event)">'+cards+'</div>';
+    });
+    html+='</div>';
+  });
+  html+='</div>';
+  return html;
+}
 function kanbanCard(t){
-  const pole=POLES.find(p=>p.id===t.pole);
   const proj=S.projects.find(p=>p.id===t.project);
   const us=S.users.filter(u=>t.assignees&&t.assignees.includes(u.id));
-  const poleColor=pole?'var('+pole.color+')'  :'var(--bd2)';
   const editable=canEditTask(t);
   const dragAttr=editable?'draggable="true"':'draggable="false"';
-  const dragStart=editable?'ondragstart="kanbanDragStart(event,\''+t.id+'\')"':'';
-  const dblClick=editable?'ondblclick="openEditTask(\''+t.id+'\')"':'';
-  const cardStyle='--card-color:'+poleColor+';'+(editable?'':'opacity:.75;cursor:default;');
-  const titleAttr=editable?'Double-clic pour modifier':'Lecture seule';
-
-  return '<div class="kb-card '+(editable?'':'kb-readonly')+'" id="kbc-'+t.id+'" '+
-    dragAttr+' style="'+cardStyle+'" '+dragStart+' '+dblClick+' title="'+titleAttr+'">'+
-    '<div class="kc-name">'+t.name+(editable?'':'<span style="float:right;font-size:9px;color:var(--tx4);">👁</span>')+'</div>'+
-    '<div class="kc-meta">'+
-      (t.priority==='urgent'?'<span class="badge urg">URGENT</span>':'')+
-      (proj?'<span class="badge" style="background:var(--brand-xs);color:var(--brand-d);border:1px solid rgba(212,135,58,.2);font-size:9px;">🏗 '+proj.name.slice(0,16)+'</span>':'')+
-      (pole?'<span class="badge pole-badge pole-'+pole.id+'">'+pole.ico+' '+pole.label+'</span>':'')+
-    '</div>'+
-    '<div class="kc-bottom">'+
-      '<div class="kc-user">'+
-        us.map(u=>'<div class="kc-avatar" style="background:'+u.color+'" title="'+u.name+'">'+u.initials+'</div>').join('')+
-        (us.length?'<span class="kc-uname">'+us[0].name.split(' ')[0]+'</span>':'')+
-      '</div>'+
-      (t.estimate?'<span class="kc-time">⏳'+t.estimate+'m</span>':'')+
-    '</div>'+
+  const dragStart=editable?'ondragstart="kanbanDragStart(event,\''+t.id+'\')" ondragend="kanbanDragEnd(event)"':'';
+  const click=editable?'onclick="openEditTask(\''+t.id+'\')"':'';
+  const urgClass=t.priority==='urgent'?' urg':'';
+  const avatars=us.length?'<div class="kc-avatars">'+us.slice(0,3).map(u=>'<span class="kc-av" style="background:'+u.color+'" title="'+esc(u.name)+'">'+u.initials+'</span>').join('')+(us.length>3?'<span class="kc-more">+'+(us.length-3)+'</span>':'')+'</div>':'';
+  const projHtml=proj?'<span class="kc-proj" title="'+esc(proj.name)+'">'+esc(proj.name)+'</span>':'<span></span>';
+  return '<div class="kb-card'+urgClass+(editable?'':' kb-readonly')+'" id="kbc-'+t.id+'" '+dragAttr+' '+dragStart+' '+click+' title="'+(editable?'Cliquer pour modifier':'Lecture seule')+'">'+
+    '<div class="kc-name">'+esc(t.name)+'</div>'+
+    '<div class="kc-foot">'+projHtml+avatars+'</div>'+
   '</div>';
 }
 let dragTaskId=null;
-function kanbanDragStart(e,id){dragTaskId=id;e.target.classList.add('dragging');e.dataTransfer.effectAllowed='move';}
+function kanbanDragStart(e,id){dragTaskId=id;e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',id);e.target.classList.add('dragging');}
+function kanbanDragEnd(e){document.querySelectorAll('.dragging,.drop-target,.drag-over-col').forEach(el=>el.classList.remove('dragging','drop-target','drag-over-col'));dragTaskId=null;}
 function kanbanDragOver(e,status){e.preventDefault();e.dataTransfer.dropEffect='move';document.getElementById('kbc-'+status).classList.add('drag-over-col');}
 function kanbanDragLeave(e){document.querySelectorAll('.kb-col').forEach(c=>c.classList.remove('drag-over-col'));}
+
+// ── Drag & drop réordonnancement des tâches en liste ──
+let _taskDragId=null;
+
+// ── Drag & drop swim lane (admin) ──
+function swimDragOver(e,status){
+  if(!dragTaskId)return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  document.querySelectorAll('.swim-statCell').forEach(c=>c.classList.toggle('drop-target',c.dataset.status===status));
+}
+function swimDragLeave(e){}
+function swimDrop(e,status,userId){
+  e.preventDefault();
+  document.querySelectorAll('.swim-statCell').forEach(c=>c.classList.remove('drop-target'));
+  if(!dragTaskId)return;
+  const t=S.tasks.find(x=>x.id===dragTaskId);
+  if(t){
+    if(!canEditTask(t)){toast('\ud83d\udc41 Action non autoris\u00e9e','w');dragTaskId=null;return;}
+    const prevStatus=t.status;
+    t.status=status;
+    t.assignees=[userId]; // r\u00e9assigne \u00e0 l'utilisateur de la ligne
+    if(status==='inprogress'&&prevStatus!=='inprogress'&&!t.timerRunning){startTimer(t.id);}
+    else if((status==='done'||status==='waiting'||status==='cancelled'||status==='todo')&&t.timerRunning){stopTimer(t.id);}
+    if(status==='done'){t.done=true;t.completedAt=Date.now();}else{t.done=false;t.completedAt=null;}
+    save();syncNow();renderKanban();renderSidebar();
+    const un=S.users.find(u=>u.id===userId);
+    if(status==='done'){toast('\u2705 Termin\u00e9e','s');}
+    else{toast('\u2192 '+STATUSES.find(s=>s.id===status).label+(un?' \u00b7 '+un.name.split(' ')[0]:''),'i');}
+  }
+  dragTaskId=null;
+}
+function taskDragStart(e,id){
+  _taskDragId=id;
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain',id);
+  const card=document.getElementById('tc-'+id);
+  if(card)card.classList.add('tlc-dragging');
+}
+function taskDragEnd(e){
+  document.querySelectorAll('.tlc-dragging,.tlc-drop-above,.tlc-drop-below').forEach(el=>el.classList.remove('tlc-dragging','tlc-drop-above','tlc-drop-below'));
+  _taskDragId=null;
+}
+function taskDragOver(e,id){
+  if(!_taskDragId||_taskDragId===id)return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  const el=document.getElementById('tc-'+id);
+  if(!el)return;
+  const rect=el.getBoundingClientRect();
+  const below=e.clientY>(rect.top+rect.height/2);
+  el.classList.remove('tlc-drop-above','tlc-drop-below');
+  el.classList.add(below?'tlc-drop-below':'tlc-drop-above');
+}
+function taskDragLeave(e,id){
+  const el=document.getElementById('tc-'+id);
+  if(el)el.classList.remove('tlc-drop-above','tlc-drop-below');
+}
+function taskDrop(e,targetId){
+  e.preventDefault();
+  e.stopPropagation();
+  const dragId=_taskDragId;
+  if(!dragId||dragId===targetId){taskDragEnd(e);return;}
+  const el=document.getElementById('tc-'+targetId);
+  const rect=el.getBoundingClientRect();
+  const below=e.clientY>(rect.top+rect.height/2);
+  const dragIdx=S.tasks.findIndex(t=>t.id===dragId);
+  if(dragIdx<0){taskDragEnd(e);return;}
+  const [moved]=S.tasks.splice(dragIdx,1);
+  let newIdx=S.tasks.findIndex(t=>t.id===targetId);
+  if(newIdx<0){S.tasks.splice(dragIdx,0,moved);taskDragEnd(e);return;}
+  if(below)newIdx++;
+  S.tasks.splice(newIdx,0,moved);
+  taskDragEnd(e);
+  save();renderPage(S.cur);syncNow();
+  toast('✓ Ordre mis à jour','s');
+}
+
 function kanbanDrop(e,status){
   e.preventDefault();document.querySelectorAll('.kb-col').forEach(c=>c.classList.remove('drag-over-col'));
   if(!dragTaskId)return;
@@ -1551,17 +1850,19 @@ function kanbanDrop(e,status){
     // Auto-timer
     if(status==='inprogress'&&prevStatus!=='inprogress'&&!t.timerRunning&&!t.done){
       startTimer(t.id);
-    } else if((status==='done'||status==='waiting'||status==='cancelled')&&t.timerRunning){
+    } else if((status==='done'||status==='waiting'||status==='cancelled'||status==='todo')&&t.timerRunning){
       stopTimer(t.id);
     }
     if(status==='done'){
       t.done=true;
-      t.archived=true;
-      toast('✅ "'+t.name.slice(0,22)+'" terminée et archivée','s');
+      t.completedAt=Date.now();
+      toast('✅ "'+t.name.slice(0,22)+'" terminée','s');
     } else if(status==='cancelled'){
       t.done=false;
+      t.completedAt=null;
     } else {
       t.done=false;
+      t.completedAt=null;
     }
     save();syncNow();renderKanban();renderSidebar();
     addNotif('Kanban','Tâche "'+t.name.slice(0,20)+'" → '+STATUSES.find(s=>s.id===status).label,'i');
@@ -1570,37 +1871,222 @@ function kanbanDrop(e,status){
 }
 
 // ── PROJECTS ──
+// ═══ DOSSIERS PROJETS ═══
+// Chemin (fil d'ariane) depuis la racine jusqu'au dossier
+function folderPath(id){
+  const path=[];let cur=id;let guard=0;
+  while(cur&&guard<50){
+    const f=S.projects.find(p=>p.id===cur&&p.isFolder);
+    if(!f)break;
+    path.unshift(f);cur=f.parentId;guard++;
+  }
+  return path;
+}
+function openFolder(id){ S.curFolder=id; renderProjects(); }
+function saveFolder(){
+  const name=document.getElementById('mf-n').value.trim();
+  if(!name){toast('Entrez un nom','e');return;}
+  S.projects.push({id:'f'+Date.now(),name,isFolder:true,parentId:S.curFolder||null,archived:false,deleted:false,createdAt:Date.now()});
+  document.getElementById('mf-n').value='';
+  save();renderProjects();closeModal('moFolder');syncNow();toast('\ud83d\udcc1 Dossier cr\u00e9\u00e9','s');
+}
+function archiveFolder(id){
+  const f=S.projects.find(p=>p.id===id);if(!f)return;
+  // Remonte les enfants vers le parent pour ne rien perdre
+  S.projects.forEach(p=>{if(p.parentId===id)p.parentId=f.parentId||null;});
+  f.archived=true;
+  save();renderProjects();syncNow();toast('\ud83d\udce6 Dossier archiv\u00e9 (contenu remont\u00e9)','i');
+}
+function softDeleteFolder(id){
+  const f=S.projects.find(p=>p.id===id);if(!f)return;
+  S.projects.forEach(p=>{if(p.parentId===id)p.parentId=f.parentId||null;});
+  f.deleted=true;
+  save();renderProjects();syncNow();toast('\ud83d\uddd1 Dossier supprim\u00e9 (contenu remont\u00e9)','i');
+}
+// Picker de déplacement
+let _moveItemId=null;
+function openMovePicker(itemId){
+  _moveItemId=itemId;
+  const item=S.projects.find(p=>p.id===itemId);
+  if(!item)return;
+  // Liste des dossiers possibles (exclure soi-même et ses descendants si c'est un dossier)
+  const exclude=new Set();
+  if(item.isFolder){
+    const collect=(fid)=>{exclude.add(fid);S.projects.filter(p=>p.parentId===fid&&p.isFolder).forEach(c=>collect(c.id));};
+    collect(itemId);
+  }
+  const folders=S.projects.filter(p=>p.isFolder&&!p.archived&&!p.deleted&&!exclude.has(p.id));
+  let html='<div class="move-opt" onclick="doMove(null)"><span>\ud83c\udfe0</span> Racine (aucun dossier)</div>';
+  folders.forEach(f=>{
+    const depth=folderPath(f.id).length-1;
+    html+='<div class="move-opt" onclick="doMove(\''+f.id+'\')" style="padding-left:'+(14+depth*16)+'px"><span>\ud83d\udcc1</span> '+esc(f.name)+'</div>';
+  });
+  document.getElementById('moveList').innerHTML=html;
+  openModal('moMove');
+}
+function doMove(folderId){
+  const item=S.projects.find(p=>p.id===_moveItemId);
+  if(item){ item.parentId=folderId; save();renderProjects();syncNow();toast('\u2705 D\u00e9plac\u00e9','s'); }
+  _moveItemId=null;closeModal('moMove');
+}
+
+// ═══ DRAG & DROP DOSSIERS/PROJETS ═══
+let _projDragId=null;
+function projDragStart(e,id){
+  _projDragId=id;
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain',id);
+  const el=document.getElementById('proj-'+id);
+  if(el)el.classList.add('proj-dragging');
+}
+function projDragEnd(e){
+  document.querySelectorAll('.proj-dragging,.proj-drop-target,.crumb-drop').forEach(el=>el.classList.remove('proj-dragging','proj-drop-target','crumb-drop'));
+  _projDragId=null;
+}
+function projDragOver(e,folderId){
+  if(!_projDragId||_projDragId===folderId)return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  const el=document.getElementById('proj-'+folderId);
+  if(el)el.classList.add('proj-drop-target');
+}
+function projDragLeave(e,folderId){
+  const el=document.getElementById('proj-'+folderId);
+  if(el)el.classList.remove('proj-drop-target');
+}
+// Vérifie qu'on ne crée pas de boucle (dossier dans son propre descendant)
+function _wouldCycle(itemId,targetFolderId){
+  if(!targetFolderId)return false;
+  let cur=S.projects.find(p=>p.id===targetFolderId);let guard=0;
+  while(cur&&guard<50){
+    if(cur.id===itemId)return true;
+    cur=S.projects.find(p=>p.id===cur.parentId);guard++;
+  }
+  return false;
+}
+function projDrop(e,targetFolderId){
+  e.preventDefault();e.stopPropagation();
+  const dragId=_projDragId;
+  projDragEnd(e);
+  if(!dragId||dragId===targetFolderId)return;
+  const item=S.projects.find(p=>p.id===dragId);
+  const target=S.projects.find(p=>p.id===targetFolderId);
+  if(!item||!target||!target.isFolder)return;
+  if(item.isFolder&&_wouldCycle(dragId,targetFolderId)){toast('\u26a0 Impossible : un dossier ne peut pas entrer dans lui-m\u00eame','e');return;}
+  if((item.parentId||null)===targetFolderId)return; // d\u00e9j\u00e0 dedans
+  item.parentId=targetFolderId;
+  save();renderProjects();syncNow();toast('\u2705 D\u00e9plac\u00e9 dans \u00ab '+target.name+' \u00bb','s');
+}
+// Drop sur un \u00e9l\u00e9ment du fil d'ariane (remonte \u00e0 ce niveau)
+function crumbDrop(e,folderId){
+  e.preventDefault();e.stopPropagation();
+  const dragId=_projDragId;
+  projDragEnd(e);
+  if(!dragId)return;
+  const item=S.projects.find(p=>p.id===dragId);
+  if(!item)return;
+  const dest=folderId||null;
+  if(item.isFolder&&dest&&_wouldCycle(dragId,dest)){toast('\u26a0 Impossible','e');return;}
+  if((item.parentId||null)===dest)return;
+  item.parentId=dest;
+  save();renderProjects();syncNow();toast('\u2705 D\u00e9plac\u00e9','s');
+}
+function crumbDragOver(e){
+  if(!_projDragId)return;
+  e.preventDefault();
+  e.currentTarget.classList.add('crumb-drop');
+}
+function crumbDragLeave(e){ e.currentTarget.classList.remove('crumb-drop'); }
+
 function renderProjects(){
-  const projs=S.projects.filter(p=>!p.archived&&!p.deleted);
-  document.getElementById('sub-projects').textContent=projs.length+' projet'+(projs.length>1?'s':'');
+  const cur=S.curFolder||null;
+  // Fil d'ariane
+  const path=folderPath(cur);
+  let crumb='<span class="crumb-item'+(cur?'':' active')+'" onclick="openFolder(null)" ondragover="crumbDragOver(event)" ondragleave="crumbDragLeave(event)" ondrop="crumbDrop(event,null)">\ud83c\udfe0 Projets</span>';
+  path.forEach((f,i)=>{
+    const isLast=i===path.length-1;
+    crumb+='<span class="crumb-sep">\u203a</span><span class="crumb-item'+(isLast?' active':'')+'" onclick="openFolder(\''+f.id+'\')" ondragover="crumbDragOver(event)" ondragleave="crumbDragLeave(event)" ondrop="crumbDrop(event,\''+f.id+'\')">'+esc(f.name)+'</span>';
+  });
+  document.getElementById('projBreadcrumb').innerHTML=crumb;
+
+  // Contenu du dossier courant
+  const folders=S.projects.filter(p=>p.isFolder&&!p.archived&&!p.deleted&&(p.parentId||null)===cur);
+  const projs=S.projects.filter(p=>!p.isFolder&&!p.archived&&!p.deleted&&(p.parentId||null)===cur);
+
+  const totalProjs=S.projects.filter(p=>!p.isFolder&&!p.archived&&!p.deleted).length;
+  document.getElementById('sub-projects').textContent=totalProjs+' projet'+(totalProjs>1?'s':'')+(folders.length?' \u00b7 '+folders.length+' dossier'+(folders.length>1?'s':''):'');
+
   const g=document.getElementById('projGrid');
-  if(!projs.length){g.innerHTML='<div class="empty"><div class="ei">🏗</div><h3>Aucun projet</h3><p>Créez votre premier chantier</p></div>';return;}
-  g.innerHTML=projs.map((p,i)=>{
+  if(!folders.length&&!projs.length){
+    g.innerHTML='<div class="empty"><div class="ei">\ud83d\udcc1</div><h3>Dossier vide</h3><p>Cr\u00e9ez un dossier ou un projet ici</p></div>';
+    return;
+  }
+
+  let html='';
+  // Dossiers d'abord
+  folders.forEach(f=>{
+    const childFolders=S.projects.filter(p=>p.isFolder&&!p.archived&&!p.deleted&&p.parentId===f.id).length;
+    const childProjs=S.projects.filter(p=>!p.isFolder&&!p.archived&&!p.deleted&&p.parentId===f.id).length;
+    // Compter toutes les tâches dans ce dossier (récursif simple : projets directs)
+    const descProjIds=getAllProjectsInFolder(f.id);
+    const allTasks=S.tasks.filter(t=>descProjIds.includes(t.project)&&!t.deleted);
+    const doneTasks=allTasks.filter(t=>t.done).length;
+    let info=[];
+    if(childFolders)info.push(childFolders+' dossier'+(childFolders>1?'s':''));
+    if(childProjs)info.push(childProjs+' projet'+(childProjs>1?'s':''));
+    const infoTxt=info.length?info.join(' \u00b7 '):'vide';
+    html+='<div class="folder-card" id="proj-'+f.id+'" draggable="true" onclick="openFolder(\''+f.id+'\')" ondragstart="projDragStart(event,\''+f.id+'\')" ondragend="projDragEnd(event)" ondragover="projDragOver(event,\''+f.id+'\')" ondrop="projDrop(event,\''+f.id+'\')" ondragleave="projDragLeave(event,\''+f.id+'\')">'+
+      '<div class="fc-top">'+
+        '<div class="fc-ico">\ud83d\udcc1</div>'+
+        '<div class="fc-acts">'+
+          '<button class="pc-act" onclick="event.stopPropagation();openMovePicker(\''+f.id+'\')" title="D\u00e9placer">\u21f2</button>'+
+          '<button class="pc-act" onclick="event.stopPropagation();archiveFolder(\''+f.id+'\')" title="Archiver">\ud83d\udce6</button>'+
+          '<button class="pc-act del" onclick="event.stopPropagation();softDeleteFolder(\''+f.id+'\')" title="Supprimer">\u00d7</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="fc-name">'+esc(f.name)+'</div>'+
+      '<div class="fc-info">'+infoTxt+(allTasks.length?' \u00b7 '+doneTasks+'/'+allTasks.length+' t\u00e2ches':'')+'</div>'+
+    '</div>';
+  });
+  // Projets ensuite
+  projs.forEach((p,i)=>{
     const pt=S.tasks.filter(t=>t.project===p.id&&!t.deleted);
     const dn=pt.filter(t=>t.done).length,ug=pt.filter(t=>!t.done&&t.priority==='urgent').length;
     const nm=pt.filter(t=>!t.done&&t.priority==='normal').length;
     const pct=pt.length?Math.round(dn/pt.length*100):0;
     const ts=pt.reduce((a,t)=>a+t.elapsed,0);
     const pole=POLES.find(x=>x.id===p.pole);
-    return `<div class="pc" onclick="openProject('${p.id}')">
-      <div class="pct">
-        <div class="pcico">${ICOS[i%ICOS.length]}</div>
-        <div class="pc-acts">
-          <button class="pc-act" onclick="event.stopPropagation();archiveProject('${p.id}')" title="Archiver">📦</button>
-          <button class="pc-act del" onclick="event.stopPropagation();softDeleteProject('${p.id}')" title="Supprimer">×</button>
-        </div>
-      </div>
-      <div class="pcn">${p.name}</div>
-      <div class="pcc">${p.client||'—'} ${pole?`· <span class="pole-badge pole-${pole.id}" style="font-size:9px;">${pole.ico}</span>`:''} </div>
-      <div class="pcst">
-        ${ug?`<div class="pcs"><div class="pcd u"></div>${ug} urg.</div>`:''}
-        ${nm?`<div class="pcs"><div class="pcd n"></div>${nm} norm.</div>`:''}
-        ${dn?`<div class="pcs"><div class="pcd d"></div>${dn} fait${dn>1?'s':''}</div>`:''}
-      </div>
-      <div class="pb"><div class="pbf" style="width:${pct}%"></div></div>
-      <div class="pctm"><span>${pct}% fait</span><span>${ts>0?fmt(ts):''}</span></div>
-    </div>`;
-  }).join('');
+    html+='<div class="pc" id="proj-'+p.id+'" draggable="true" onclick="openProject(\''+p.id+'\')" ondragstart="projDragStart(event,\''+p.id+'\')" ondragend="projDragEnd(event)">'+
+      '<div class="pct">'+
+        '<div class="pcico">'+ICOS[i%ICOS.length]+'</div>'+
+        '<div class="pc-acts">'+
+          '<button class="pc-act" onclick="event.stopPropagation();openMovePicker(\''+p.id+'\')" title="D\u00e9placer">\u21f2</button>'+
+          '<button class="pc-act" onclick="event.stopPropagation();archiveProject(\''+p.id+'\')" title="Archiver">\ud83d\udce6</button>'+
+          '<button class="pc-act del" onclick="event.stopPropagation();softDeleteProject(\''+p.id+'\')" title="Supprimer">\u00d7</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="pcn">'+esc(p.name)+'</div>'+
+      '<div class="pcc">'+esc(p.client||'\u2014')+(pole?' \u00b7 <span class="pole-badge pole-'+pole.id+'" style="font-size:9px;">'+pole.ico+'</span>':'')+'</div>'+
+      '<div class="pcst">'+
+        (ug?'<div class="pcs"><div class="pcd u"></div>'+ug+' urg.</div>':'')+
+        (nm?'<div class="pcs"><div class="pcd n"></div>'+nm+' norm.</div>':'')+
+        (dn?'<div class="pcs"><div class="pcd d"></div>'+dn+' fait'+(dn>1?'s':'')+'</div>':'')+
+      '</div>'+
+      '<div class="pb"><div class="pbf" style="width:'+pct+'%"></div></div>'+
+      '<div class="pctm"><span>'+pct+'% fait</span><span>'+(ts>0?fmt(ts):'')+'</span></div>'+
+    '</div>';
+  });
+  g.innerHTML=html;
+}
+
+// Récupère tous les projets (ids) contenus dans un dossier, récursivement
+function getAllProjectsInFolder(folderId){
+  let ids=[];
+  S.projects.filter(p=>p.parentId===folderId&&!p.deleted).forEach(p=>{
+    if(p.isFolder){ ids=ids.concat(getAllProjectsInFolder(p.id)); }
+    else{ ids.push(p.id); }
+  });
+  return ids;
 }
 function openProject(id){S.curProjId=id;goPage('detail');}
 function renderDetail(){
@@ -1618,10 +2104,10 @@ function renderDetail(){
   else if(S.df==='running')act=act.filter(t=>t.timerRunning);
   act.sort((a,b)=>a.priority==='urgent'?-1:1);
   const show=[...act,...all.filter(t=>t.done&&!t.archived)];
-  document.getElementById('det-tasks').innerHTML=show.length?show.map(t=>tcard(t,false,false)).join(''):'<div class="empty"><div class="ei">📋</div><h3>Aucune tâche</h3></div>';
+  document.getElementById('det-tasks').innerHTML=show.length?show.map(t=>tcardLine(t,false)).join(''):'<div class="empty"><div class="ei">📋</div><h3>Aucune tâche</h3></div>';
   const arch=S.tasks.filter(t=>t.project===p.id&&t.archived&&!t.deleted);
   document.getElementById('det-albl').textContent='Archivées ('+arch.length+')';
-  document.getElementById('det-arch').innerHTML=arch.map(t=>tcard(t,true)).join('');
+  document.getElementById('det-arch').innerHTML=arch.map(t=>tcardLine(t,true)).join('');
 }
 function toggleDetArch(){
   S.detArchOpen=!S.detArchOpen;
@@ -1646,8 +2132,10 @@ function renderAllTasks(){
   el.innerHTML=Object.keys(bp).map(pid=>{
     const p=S.projects.find(x=>x.id===pid);
     const projName=p?esc(p.name):'Sans projet';
-    const cards=bp[pid].map(t=>tcard(t,false,true,true)).join('');
-    return '<div class="gg"><div class="ggh">'+projName+'<div class="bar"></div></div><div class="tl compact-list">'+cards+'</div></div>';
+    // Ordre manuel (drag & drop) : actives en premier puis terminées, ordre du tableau respecté
+    const sorted=[...bp[pid].filter(t=>!t.done),...bp[pid].filter(t=>t.done)];
+    const cards=sorted.map(t=>tcardLine(t,false)).join('');
+    return '<div class="gg"><div class="ggh">'+projName+' <span style="color:var(--tx4);font-weight:400;">('+bp[pid].length+')</span><div class="bar"></div></div><div class="tl">'+cards+'</div></div>';
   }).join('');
 }
 function setGF(f,b){S.gf=f;document.querySelectorAll('#pg-all .tfs .tfb').forEach(x=>x.classList.remove('act'));b.classList.add('act');renderAllTasks();}
@@ -1655,28 +2143,40 @@ function setGF(f,b){S.gf=f;document.querySelectorAll('#pg-all .tfs .tfb').forEac
 // ── MY TASKS ──
 function renderMyTasks(){
   if(!CU)return;
-  // Mes tâches = uniquement celles où je suis assigné (même pour l'admin)
   const tasks=S.tasks.filter(t=>
     !t.archived&&!t.deleted&&
     t.assignees&&t.assignees.includes(CU.id)
   );
-  const active=tasks.filter(t=>!t.done).sort((a,b)=>a.priority==='urgent'?-1:1);
+  // Ordre manuel (drag & drop) : on respecte l'ordre du tableau S.tasks
+  const active=tasks.filter(t=>!t.done);
   const done=tasks.filter(t=>t.done);
   document.getElementById('my-sub').textContent=
     active.length+' tâche(s) active(s) assignée(s) à '+CU.name.split(' ')[0];
   document.getElementById('myTasksList').innerHTML=
     [...active,...done].length
-    ?[...active,...done].map(t=>tcard(t,false,true)).join('')
+    ?[...active,...done].map(t=>tcardLine(t,false)).join('')
     :'<div class="empty"><div class="ei">🎯</div><h3>Aucune tâche assignée</h3><p>Toutes vos tâches sont terminées !</p></div>';
 }
-
 // ── URGENT PAGE ──
 function renderUrgentPage(){
-  const tasks=S.tasks.filter(t=>t.priority==='urgent'&&!t.done&&!t.archived&&!t.deleted).sort((a,b)=>a.timerRunning?-1:1);
-  document.getElementById('urgentList').innerHTML=tasks.length?tasks.map(t=>tcard(t,false,true)).join(''):'<div class="empty"><div class="ei">✅</div><h3>Aucune urgente !</h3><p>Tout est sous contrôle.</p></div>';
+  const tasks=S.tasks.filter(t=>t.priority==='urgent'&&!t.done&&!t.archived&&!t.deleted);
+  document.getElementById('urgentList').innerHTML=tasks.length?tasks.map(t=>tcardLine(t,false)).join(''):'<div class="empty"><div class="ei">✅</div><h3>Aucune urgente !</h3><p>Tout est sous contrôle.</p></div>';
 }
 
 // ── POLE PAGE ──
+
+function renderDonePage(){
+  if(!CU)return;
+  const isAdmin=CU.role==='admin'||CU.role==='manager';
+  let done=S.tasks.filter(t=>t.done&&!t.archived&&!t.deleted);
+  if(!isAdmin) done=done.filter(t=>t.assignees&&t.assignees.includes(CU.id));
+  // Tri par date de complétion (plus récent en premier)
+  done.sort((a,b)=>(b.completedAt||b.createdAt||0)-(a.completedAt||a.createdAt||0));
+  document.getElementById('done-sub').textContent=done.length+' tâche(s) terminée(s)'+(isAdmin?' — toute l\'équipe':'');
+  document.getElementById('doneList').innerHTML=done.length
+    ?done.map(t=>tcardLine(t,false)).join('')
+    :'<div class="empty"><div class="ei">✅</div><h3>Aucune tâche terminée</h3><p>Les tâches que vous validez apparaîtront ici.</p></div>';
+}
 function renderPole(poleId){
   const pole=POLES.find(p=>p.id===poleId);if(!pole)return;
   document.getElementById('pole-title').textContent=pole.ico+' '+pole.label;
@@ -1688,8 +2188,9 @@ function renderPole(poleId){
   else renderPoleProjectsTab(poleId);
 }
 function renderPoleTasksTab(poleId){
-  const tasks=S.tasks.filter(t=>t.pole===poleId&&!t.archived&&!t.deleted).sort((a,b)=>a.done===b.done?0:(a.done?1:-1));
-  document.getElementById('poleContent').innerHTML=tasks.length?'<div class="tl compact-list">'+tasks.map(t=>tcard(t,false,false,true)).join('')+'</div>':'<div class="empty"><div class="ei">📋</div><h3>Aucune tâche</h3></div>';
+  const allP=S.tasks.filter(t=>t.pole===poleId&&!t.archived&&!t.deleted);
+  const tasks=[...allP.filter(t=>!t.done),...allP.filter(t=>t.done)];
+  document.getElementById('poleContent').innerHTML=tasks.length?'<div class="tl">'+tasks.map(t=>tcardLine(t,false)).join('')+'</div>':'<div class="empty"><div class="ei">📋</div><h3>Aucune tâche</h3></div>';
 }
 function renderPoleProjectsTab(poleId){
   const projs=S.projects.filter(p=>p.pole===poleId&&!p.archived&&!p.deleted);
@@ -1726,6 +2227,57 @@ function canEditTask(t){
 function canDeleteTask(t){return canEditTask(t);}
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function tcardLine(t,arch){
+  const p=S.projects.find(x=>x.id===t.project);
+  const us=S.users.filter(u=>t.assignees&&t.assignees.includes(u.id));
+  const editable=canEditTask(t);
+  const isTimerUser=!CU||(t.assignees&&t.assignees.includes(CU.id))||CU.role==='admin'||CU.role==='manager';
+
+  // Checkbox
+  const ck='<div class="tlc-ck '+(t.done?'on':'')+'" '+
+    (editable?'onclick="event.stopPropagation();toggleDone(\''+t.id+'\')"':'style="opacity:.3;pointer-events:none"')+
+    ' title="'+(editable?'Valider':'Lecture seule')+'"></div>';
+
+  // Avatars (max 3)
+  const avatars=us.slice(0,3).map(u=>'<div class="tlc-av" style="background:'+u.color+'" title="'+esc(u.name)+'">'+u.initials+'</div>').join('')+
+    (us.length>3?'<span class="tlc-more">+'+(us.length-3)+'</span>':'');
+
+  // Projet (court)
+  const projHtml=p?'<span class="tlc-proj" title="'+esc(p.name)+'">'+esc(p.name.length>16?p.name.slice(0,16)+'…':p.name)+'</span>':'';
+
+  // Timer compact
+  const timeHtml='<span class="tlc-time" id="td-'+t.id+'">'+fmt(t.elapsed)+'</span>';
+
+  // Boutons
+  let btns='';
+  if(isTimerUser&&!t.done){
+    btns+=t.timerRunning
+      ?'<button class="tlc-btn stop" onclick="event.stopPropagation();stopTimer(\''+t.id+'\')" title="Stop">⏹</button>'
+      :'<button class="tlc-btn play" onclick="event.stopPropagation();startTimer(\''+t.id+'\')" title="Démarrer">▶</button>';
+  }
+  if(editable&&t.done&&!arch) btns+='<button class="tlc-btn" onclick="event.stopPropagation();archiveTask(\''+t.id+'\')" title="Archiver">📦</button>';
+  if(arch&&CU&&(CU.role==='admin'||CU.role==='manager')) btns+='<button class="tlc-btn" onclick="event.stopPropagation();restoreTask(\''+t.id+'\')" title="Restaurer">↩</button>';
+  if(editable) btns+='<button class="tlc-btn del" onclick="event.stopPropagation();softDeleteTask(\''+t.id+'\')" title="Supprimer">×</button>';
+
+  const cls='tlc '+(t.priority==='urgent'?'urg':'')+' '+(t.done?'done':'')+' '+(t.timerRunning?'run':'')+' '+(!editable?'ro':'');
+  const click=editable?'onclick="openEditTask(\''+t.id+'\')"':'';
+  // Drag & drop pour réordonner (seulement si éditable)
+  // Carte ENTIÈRE draggable (approche testée et validée)
+  const dragAttrs=editable
+    ?'draggable="true" ondragstart="taskDragStart(event,\''+t.id+'\')" ondragend="taskDragEnd(event)" ondragover="taskDragOver(event,\''+t.id+'\')" ondrop="taskDrop(event,\''+t.id+'\')" ondragleave="taskDragLeave(event,\''+t.id+'\')"'
+    :'';
+
+  return '<div class="'+cls+'" id="tc-'+t.id+'" '+dragAttrs+'>'+
+    '<span class="tlc-grip" title="Glisser pour réordonner">⠿</span>'+
+    ck+
+    '<div class="tlc-main" '+click+'>'+
+      '<span class="tlc-name" title="'+esc(t.name)+'">'+(t.priority==='urgent'?'<span class="tlc-dot"></span>':'')+esc(t.name)+'</span>'+
+    '</div>'+
+    '<div class="tlc-meta">'+projHtml+avatars+timeHtml+'</div>'+
+    '<div class="tlc-actions">'+btns+'</div>'+
+  '</div>';
+}
+
 function tcard(t,arch,showProj,compact){
   const p=S.projects.find(x=>x.id===t.project);
   const pole=POLES.find(x=>x.id===t.pole);
@@ -1789,6 +2341,7 @@ function toggleDone(id){
   if(!canEditTask(t)){toast('🔒 Vous ne pouvez pas modifier cette tâche','w');return;}
   if(t.timerRunning)stopTimer(id);
   t.done=!t.done;t.status=t.done?'done':'inprogress';
+  if(t.done)t.completedAt=Date.now();else t.completedAt=null;
   save();renderAll();toast(t.done?'✓ Validée !':'Réactivée','s');
   syncNow();
 }
@@ -1848,7 +2401,7 @@ function renderArchive(){
         '<div class="ggh"><span class="pole-badge pole-'+pole.id+'" style="margin-right:4px;">'+pole.ico+' '+pole.label+'</span>'+
         '<span style="font-size:11px;color:var(--tx3);font-family:JetBrains Mono,monospace;">('+pt.length+')</span>'+
         '<div class="bar"></div></div>'+
-        '<div class="tl compact-list">'+pt.map(t=>tcard(t,true,true,true)).join('')+'</div>'+
+        '<div class="tl compact-list">'+pt.map(t=>tcardLine(t,true)).join('')+'</div>'+
       '</div>';
     });
     // Tâches sans pôle
@@ -1856,7 +2409,7 @@ function renderArchive(){
     if(nopole.length){
       html+='<div class="gg">'+
         '<div class="ggh">⬜ Sans pôle<div class="bar"></div></div>'+
-        '<div class="tl compact-list">'+nopole.map(t=>tcard(t,true,true,true)).join('')+'</div>'+
+        '<div class="tl compact-list">'+nopole.map(t=>tcardLine(t,true)).join('')+'</div>'+
       '</div>';
     }
     el.innerHTML=html;
@@ -2391,9 +2944,7 @@ function saveTask(){
     toast('✓ Tâche mise à jour','s');
   }else{
     const newTask={id:'t'+Date.now(),name,project:document.getElementById('mt-proj').value,priority:document.getElementById('mt-prio').value,pole,assignees,estimate:parseInt(document.getElementById('mt-est').value)||0,notes:document.getElementById('mt-notes').value.trim(),dateStart:document.getElementById('mt-dstart').value,dateEnd:document.getElementById('mt-dend').value,elapsed:0,timerRunning:false,done:false,archived:false,deleted:false,status:'todo',createdAt:Date.now(),createdBy:CU?CU.id:''};
-    S.tasks.unshift(newTask);
-    // Debug log
-    console.log('[saveTask] Task created:',{name:newTask.name,assignees:newTask.assignees,pole:newTask.pole,CU_id:CU?CU.id:'null'});
+    S.tasks.push(newTask);
     if(assignees.length)addNotif('Nouvelle tâche','Vous avez été assigné à "'+name+'"','i');
     toast('✓ Tâche "'+name+'" créée — assignée à '+assignees.length+' pers.','s');
   }
@@ -2402,7 +2953,7 @@ function saveTask(){
 }
 function saveProject(){
   const name=document.getElementById('mp-n').value.trim();if(!name){toast('Entrez un nom','e');return;}
-  S.projects.push({id:'p'+Date.now(),name,client:document.getElementById('mp-c').value.trim(),pole:document.getElementById('mp-pole').value,dateStart:document.getElementById('mp-ds').value,dateEnd:document.getElementById('mp-de').value,notes:document.getElementById('mp-notes').value.trim(),archived:false,deleted:false,createdAt:Date.now()});
+  S.projects.push({id:'p'+Date.now(),name,client:document.getElementById('mp-c').value.trim(),pole:document.getElementById('mp-pole').value,dateStart:document.getElementById('mp-ds').value,dateEnd:document.getElementById('mp-de').value,notes:document.getElementById('mp-notes').value.trim(),parentId:S.curFolder||null,isFolder:false,archived:false,deleted:false,createdAt:Date.now()});
   ['mp-n','mp-c','mp-ds','mp-de','mp-notes'].forEach(id=>document.getElementById(id).value='');
   save();renderAll();closeModal('moProject');toast('✓ Projet créé','s');
   syncNow();
@@ -2432,7 +2983,13 @@ function renderColorPicker(selected){
 function selectColor(c,el){document.querySelectorAll('.color-dot').forEach(x=>{x.classList.remove('sel');x.style.borderColor='transparent';});el.classList.add('sel');el.style.borderColor='var(--tx)';}
 function populateProjectSelect(selId){
   const sel=document.getElementById(selId);
-  sel.innerHTML='<option value="">— Sans projet —</option>'+S.projects.filter(p=>!p.deleted).map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  const projs=S.projects.filter(p=>!p.deleted&&!p.archived&&!p.isFolder);
+  sel.innerHTML='<option value="">— Sans projet —</option>'+projs.map(p=>{
+    // Préfixe le chemin du dossier parent pour s'y retrouver
+    const path=folderPath(p.parentId);
+    const prefix=path.length?path.map(f=>f.name).join(' / ')+' / ':'';
+    return '<option value="'+p.id+'">'+esc(prefix+p.name)+'</option>';
+  }).join('');
 }
 function populatePoleSelect(selId){
   const sel=document.getElementById(selId);
@@ -2599,7 +3156,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '3.6';
+const APP_VERSION = '5.3';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
