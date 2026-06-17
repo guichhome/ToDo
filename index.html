@@ -157,6 +157,10 @@ aside::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .ni[data-pole="commercial"].act{background:rgba(46,170,114,.1);border-color:rgba(46,170,114,.2);color:var(--commercial);}
 
 main{overflow-y:auto;overflow-x:hidden;background:var(--bg2);}
+/* Voile derrière le tiroir (mobile) */
+.sb-backdrop{position:fixed;inset:56px 0 0 0;background:rgba(0,0,0,.46);opacity:0;pointer-events:none;transition:opacity .26s;z-index:85;}
+.app.sidebar-open .sb-backdrop{opacity:1;pointer-events:auto;}
+@media(min-width:701px){.sb-backdrop{display:none;}}
 main::-webkit-scrollbar{width:5px;}
 main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .page{display:none;padding:20px 22px;min-height:100%;animation:pgIn .2s ease;}
@@ -442,27 +446,42 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 @media(max-width:700px){
   .app{grid-template-columns:1fr;grid-template-rows:56px 1fr;}
   .app.sidebar-open{grid-template-columns:1fr;}
-  aside{display:none;}
-  .app.sidebar-open aside{
+  /* Sidebar en tiroir : toujours dans le flux mais glissée hors écran */
+  aside{
     display:flex;position:fixed;left:0;top:56px;bottom:0;
-    z-index:80;width:260px;box-shadow:4px 0 20px rgba(0,0,0,.4);
+    width:min(286px,82vw);z-index:90;
+    transform:translateX(-100%);
+    transition:transform .26s cubic-bezier(.4,0,.2,1);
+    box-shadow:6px 0 30px rgba(0,0,0,.38);
   }
+  .app.sidebar-open aside{transform:translateX(0);}
   /* Pages */
   .page{padding:12px 10px;}
     /* Grilles */
   .fr,.fr3,.admin-grid,.kpi-grid,.projGrid,.stat-grid{grid-template-columns:1fr!important;}
   .fr2{grid-template-columns:1fr!important;}
-  /* Kanban horizontal scroll */
+  /* Kanban : defilement horizontal + swipe entre colonnes */
+  #kanbanWrap{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;overscroll-behavior-x:contain;}
+  .kanban-board{padding:8px;gap:10px;width:max-content;min-width:100%;}
+  .kanban-board.swim-mode{width:auto;}
+  .kb-col{flex:0 0 80vw;min-width:80vw;max-width:80vw;scroll-snap-align:start;}
+  .swim{min-width:640px;}
     /* Tâches compactes */
   .tc{padding:8px 10px;gap:7px;}
   .tn{font-size:13px;}
   .trow{margin-top:5px;padding-top:5px;}
   .trow-right .tbt{width:26px;height:26px;font-size:11px;}
   .ttime{font-size:12px;}
-  /* Header */
+  /* Header optimisé mobile */
   .h-logo-text{display:none!important;}
-  .hname{display:none;}
+  .user-name{display:none;}
+  .user-badge{padding:4px;}
   .hbtn{width:32px;height:32px;font-size:13px;}
+  .h-right{gap:5px;padding-right:8px;}
+  .h-mid{padding:0 8px;}
+  /* Bouton Sauvegarder : icône seule sur mobile */
+  .btn-save-txt{display:none;}
+  .btn.sm{padding:6px 9px;}
   /* KPIs 2 colonnes */
   .kpi-grid{grid-template-columns:repeat(2,1fr)!important;}
   /* Projets grille */
@@ -569,12 +588,12 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 
 /* ═══════════ KANBAN ═══════════ */
 #pg-kanban{padding:12px 14px;box-sizing:border-box;}
-#kanbanWrap{overflow:auto;border:1px solid var(--bd);border-radius:var(--r);}
+#kanbanWrap{overflow:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--bd);border-radius:var(--r);}
 #kanbanWrap::-webkit-scrollbar{height:7px;width:7px;}
 #kanbanWrap::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:4px;}
 
 /* ─── Vue colonnes (utilisateur normal) ─── */
-.kanban-board{display:flex;flex-direction:row;flex-wrap:nowrap;gap:8px;height:100%;padding:8px;}
+.kanban-board{display:flex;flex-direction:row;flex-wrap:nowrap;gap:8px;height:100%;padding:8px;min-width:min-content;}
 .kanban-board.swim-mode{display:block;padding:0;}
 .kb-col{flex:1 1 0;min-width:160px;max-width:340px;display:flex;flex-direction:column;background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;}
 .kb-col-hd{padding:9px 11px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
@@ -767,7 +786,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
       <span class="user-name" id="headerName">—</span>
     </div>
     <button class="hbtn" onclick="logout()" title="Changer d'utilisateur / Déconnexion" style="font-size:13px;">🚪</button>
-    <button class="btn sm" onclick="openModal('moSync')">💾 Sauvegarder</button>
+    <button class="btn sm" onclick="openModal('moSync')" title="Sauvegarder">💾<span class="btn-save-txt"> Sauvegarder</span></button>
     <button class="btn pri sm" onclick="openNewTask()">+ Tâche</button>
   </div>
 </header>
@@ -804,6 +823,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     <div class="ni" onclick="logout()" id="nav-logout"><span class="ico">🚪</span><span class="lbl">Déconnexion</span></div>
   </div>
 </aside>
+<div class="sb-backdrop" id="sbBackdrop" onclick="closeSidebar()"></div>
 
 <main id="mainContent">
 
@@ -1409,8 +1429,8 @@ function initApp(sessionRestore=false){
   // Admin nav
   document.getElementById('nav-admin').style.display=CU.role==='admin'?'flex':'none';
   document.getElementById('adminLabel').style.display=CU.role==='admin'?'block':'none';
-  // Sidebar state
-  if(S.sidebarOpen)document.getElementById('app').classList.add('sidebar-open');
+  // Sidebar state (tiroir sur mobile, rail/expand sur desktop)
+  applySidebarState();
   // Apply theme
   document.documentElement.setAttribute('data-theme',S.theme);
   document.getElementById('themeBtn').textContent=S.theme==='dark'?'🌙':'☀️';
@@ -1603,6 +1623,8 @@ function goPage(p){
   const labels={dashboard:'Dashboard',kanban:'Kanban',projects:'Projets',all:'Toutes les tâches','my-tasks':'Mes tâches',urgent:'Urgentes',done:'Tâches terminées',stats:'Statistiques',archive:'Archives',admin:'Administration',
     'pole-arch':'Architecture','pole-compta':'Comptabilité','pole-marketing':'Marketing','pole-gestion':'Gestion','pole-atelier':'Atelier','pole-commercial':'Commercial'};
   document.getElementById('bc').innerHTML=`<span class="cur">${labels[p]||p}</span>`;
+  // Sur mobile, refermer le tiroir après navigation
+  if(window.innerWidth<=700) closeSidebar();
   renderPage(p);
 }
 function renderPage(p){
@@ -2843,7 +2865,7 @@ function renderAdmin(){
       <div class="admin-card-hd"><div class="admin-card-title">📊 Export des données</div></div>
       <div class="admin-card-body" style="display:flex;flex-direction:column;gap:8px;">
         <button class="btn sm" onclick="exportCSV()">⬇ Export CSV complet</button>
-        <button class="btn sm" onclick="openModal('moSync')">💾 Sauvegarder</button>
+        <button class="btn sm" onclick="openModal('moSync')" title="Sauvegarder">💾<span class="btn-save-txt"> Sauvegarder</span></button>
         <button class="btn sm danger" onclick="if(confirm('Réinitialiser toutes les données ?')){localStorage.removeItem('gh_erp');location.reload();}">⚠ Réinitialiser (demo)</button>
       </div>
     </div>
@@ -3473,7 +3495,26 @@ function updateFavicon(){
     img.src=link.href;
   }catch(e){}
 }
-function toggleSidebar(){S.sidebarOpen=!S.sidebarOpen;document.getElementById('app').classList.toggle('sidebar-open',S.sidebarOpen);save();}
+function toggleSidebar(){
+  const a=document.getElementById('app');
+  const willOpen=!a.classList.contains('sidebar-open');
+  a.classList.toggle('sidebar-open',willOpen);
+  if(window.innerWidth>700){ S.sidebarOpen=willOpen; save(); }
+}
+function closeSidebar(){
+  document.getElementById('app').classList.remove('sidebar-open');
+  if(window.innerWidth>700){ S.sidebarOpen=false; save(); }
+}
+function applySidebarState(){
+  const a=document.getElementById('app');
+  if(!a)return;
+  if(window.innerWidth<=700){ a.classList.remove('sidebar-open'); }
+  else { a.classList.toggle('sidebar-open', !!S.sidebarOpen); }
+}
+if(!window._sbResizeSet){
+  window._sbResizeSet=true;
+  window.addEventListener('resize',()=>{ applySidebarState(); });
+}
 function toast(msg,type){const e=document.getElementById('toast');e.textContent=msg;e.className='toast '+type+' show';clearTimeout(window._tt);window._tt=setTimeout(()=>e.classList.remove('show'),3200);}
 
 // ── CLOSE MODALS ──
@@ -3482,7 +3523,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.7';
+const APP_VERSION = '5.8';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
