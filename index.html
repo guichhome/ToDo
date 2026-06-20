@@ -504,6 +504,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     /* Grilles */
   .fr,.fr3,.admin-grid,.kpi-grid,.projGrid,.stat-grid{grid-template-columns:1fr!important;}
   .fr2{grid-template-columns:1fr!important;}
+  #dashGrid{grid-template-columns:1fr!important;}
   /* Kanban : defilement horizontal + swipe entre colonnes */
   #kanbanWrap{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;overscroll-behavior-x:contain;}
   .kanban-board{padding:8px;gap:10px;width:max-content;min-width:100%;}
@@ -3677,7 +3678,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.12';
+const APP_VERSION = '5.14';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
@@ -3750,7 +3751,7 @@ function runSplash(cb){
   var s=document.getElementById('splashScreen');
   if(!s){ cb&&cb(); return; }
   showScreen('splash'); s.classList.remove('fade-out');
-  setTimeout(function(){ s.classList.add('fade-out'); setTimeout(function(){ s.style.display='none'; s.classList.remove('fade-out'); cb&&cb(); }, 520); }, 1300);
+  setTimeout(function(){ s.classList.add('fade-out'); setTimeout(function(){ s.style.display='none'; s.classList.remove('fade-out'); cb&&cb(); }, 520); }, 2600);
 }
 function routeAfterSplash(){
   var SESSION_TTL = 8*60*60*1000;
