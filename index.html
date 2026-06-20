@@ -156,7 +156,7 @@ aside::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .ni[data-pole="atelier"].act{background:rgba(212,135,58,.1);border-color:rgba(212,135,58,.2);color:var(--atelier);}
 .ni[data-pole="commercial"].act{background:rgba(46,170,114,.1);border-color:rgba(46,170,114,.2);color:var(--commercial);}
 
-main{overflow-y:auto;overflow-x:hidden;background:var(--bg2);}
+main{overflow-y:auto;overflow-x:hidden;min-width:0;background:var(--bg2);}
 /* Voile derrière le tiroir (mobile) */
 .sb-backdrop{position:fixed;inset:56px 0 0 0;background:rgba(0,0,0,.46);opacity:0;pointer-events:none;transition:opacity .26s;z-index:85;}
 .app.sidebar-open .sb-backdrop{opacity:1;pointer-events:auto;}
@@ -488,7 +488,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 }
 /* ── Mobile ── */
 @media(max-width:700px){
-  .app{grid-template-columns:1fr;grid-template-rows:56px 1fr;}
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:56px 1fr;}
   .app.sidebar-open{grid-template-columns:1fr;}
   /* Sidebar en tiroir : toujours dans le flux mais glissée hors écran */
   aside{
@@ -703,16 +703,17 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .mini-proj{font-size:9px;color:var(--brand-d);background:var(--brand-xs);padding:1px 6px;border-radius:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;}
 /* Optimisation mobile vue ligne : projet visible, compact */
 @media(max-width:600px){
-  .tlc{gap:7px;padding:6px 9px;}
+  .tlc{flex-wrap:wrap;row-gap:7px;gap:8px;padding:8px 11px;}
   .tlc-grip{display:none;}
-  .tlc-proj{display:inline-block;font-size:9px;padding:1px 6px;max-width:72px;}
-  .tlc-meta{gap:5px;}
-  .tlc-time{display:none;}
-  .tlc-av{width:18px;height:18px;}
+  .tlc-main{flex:1 1 100%;order:1;min-width:0;}
+  .tlc-meta{order:2;flex:0 1 auto;gap:8px;padding-left:30px;}
+  .tlc-actions{order:3;margin-left:auto;flex-shrink:0;}
+  .tlc-proj{display:inline-block;font-size:10px;padding:2px 7px;max-width:150px;}
+  .tlc-time{display:inline-block;min-width:auto;}
+  .tlc-av{width:20px;height:20px;}
 }
 @media(max-width:400px){
-  .tlc-proj{max-width:56px;}
-  .tlc-actions .tlc-btn:not(.play):not(.stop):not(.del){display:none;}
+  .tlc-proj{max-width:108px;}
 }
 
 /* Avatar rond (dashboard) */
@@ -838,10 +839,9 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 <!-- APP -->
 <div class="app" id="app" style="display:none;">
 <header>
-  <div class="h-logo" onclick="toggleSidebar()" id="hLogo">
+  <div class="h-logo" onclick="toggleSidebar()" id="hLogo" title="Menu">
     <img id="hdrLogo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="G"/>
-    <div class="hamburger"><span></span><span></span><span></span></div>
-    <div class="h-logo-text"><b>Guich'Home</b><small>ERP</small></div>
+    <div class="h-logo-text"><b style="color:var(--brand);">Tâches</b></div>
   </div>
   <div class="h-mid">
     <div class="bc" id="bc"><span class="cur">Dashboard</span></div>
@@ -854,8 +854,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
       <div class="user-avatar" id="headerAvatar" style="background:#D4873A;">?</div>
       <span class="user-name" id="headerName">—</span>
     </div>
-    <button class="hbtn" onclick="logout()" title="Changer d'utilisateur / Déconnexion" style="font-size:13px;">🚪</button>
-    <button class="btn sm" onclick="openModal('moSync')" title="Sauvegarder">💾<span class="btn-save-txt"> Sauvegarder</span></button>
+    <button class="hbtn" onclick="logout()" title="Changer d'utilisateur / Déconnexion" style="display:flex;align-items:center;justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
     <button class="btn pri sm" onclick="openNewTask()">+ Tâche</button>
   </div>
 </header>
@@ -889,6 +888,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   <div class="sb-section">
     <div class="sb-label" id="adminLabel">Admin</div>
     <div class="ni" onclick="goPage('admin')" id="nav-admin"><span class="ico">🛡</span><span class="lbl">Administration</span></div>
+    <div class="ni" onclick="openModal('moSync')" id="nav-sync"><span class="ico">☁️</span><span class="lbl">Synchronisation</span></div>
     <div class="ni" onclick="logout()" id="nav-logout"><span class="ico">🚪</span><span class="lbl">Déconnexion</span></div>
   </div>
 </aside>
@@ -929,8 +929,8 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     <div class="pgh">
       <div><div class="pgt">Projets</div><div class="pgs" id="sub-projects">—</div></div>
       <div class="pga">
-        <button class="btn sm" onclick="openModal('moFolder')">+ Dossier</button>
-        <button class="btn pri sm" onclick="openModal('moProject')">+ Projet</button>
+        <button class="btn sm" onclick="openNewFolder()">+ Dossier</button>
+        <button class="btn pri sm" onclick="openNewProject()">+ Projet</button>
       </div>
     </div>
     <div class="breadcrumb" id="projBreadcrumb"></div>
@@ -1067,6 +1067,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     </div>
     <div class="fg"><label class="fl">Notes</label><textarea class="fta" id="mt-notes" placeholder="Informations complémentaires..."></textarea></div>
     <div class="ma">
+  <button class="btn" id="resetTimerBtn" style="display:none;margin-right:auto;" onclick="resetTaskTimer(document.getElementById('editTaskId').value)" title="Remettre le temps passé à zéro">⏱ Reset compteur</button>
   <button class="btn" onclick="cancelTask()">Annuler</button>
   <button class="btn pri" onclick="saveTask()">Enregistrer</button>
 </div>
@@ -1077,6 +1078,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 <div class="mo" id="moProject">
   <div class="mbox">
     <div class="mt">Nouveau projet</div>
+    <input type="hidden" id="editProjectId"/>
     <div class="fg"><label class="fl">Nom du chantier *</label><input type="text" class="fi" id="mp-n" placeholder="Ex: Rénovation cuisine Dupont"/></div>
     <div class="fr">
       <div class="fg"><label class="fl">Client</label><input type="text" class="fi" id="mp-c" placeholder="Ex: M. et Mme Dupont"/></div>
@@ -1095,6 +1097,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 <div class="mo" id="moFolder">
   <div class="mbox">
     <div class="mt">Nouveau dossier</div>
+    <input type="hidden" id="editFolderId"/>
     <div class="fg"><label class="fl">Nom du dossier *</label><input type="text" class="fi" id="mf-n" placeholder="Ex: M. et Mme Dupont"/></div>
     <div class="ma"><button class="btn" onclick="closeModal('moFolder')">Annuler</button><button class="btn pri" onclick="saveFolder()">Créer le dossier</button></div>
   </div>
@@ -2062,6 +2065,13 @@ function openFolder(id){ S.curFolder=id; renderProjects(); }
 function saveFolder(){
   const name=document.getElementById('mf-n').value.trim();
   if(!name){toast('Entrez un nom','e');return;}
+  const _efid=document.getElementById('editFolderId');
+  if(_efid&&_efid.value){
+    const f=S.projects.find(p=>p.id===_efid.value); if(f)f.name=name;
+    _efid.value=''; document.getElementById('mf-n').value='';
+    save();renderProjects();closeModal('moFolder');syncNow();toast('✓ Dossier renommé','s');
+    return;
+  }
   S.projects.push({id:'f'+Date.now(),name,isFolder:true,parentId:S.curFolder||null,archived:false,deleted:false,createdAt:Date.now()});
   document.getElementById('mf-n').value='';
   save();renderProjects();closeModal('moFolder');syncNow();toast('\ud83d\udcc1 Dossier cr\u00e9\u00e9','s');
@@ -2175,6 +2185,7 @@ function crumbDragOver(e){
 function crumbDragLeave(e){ e.currentTarget.classList.remove('crumb-drop'); }
 
 function renderProjects(){
+  const isAdmP=CU&&(CU.role==='admin'||CU.role==='manager');
   const cur=S.curFolder||null;
   // Fil d'ariane
   const path=folderPath(cur);
@@ -2215,6 +2226,7 @@ function renderProjects(){
       '<div class="fc-top">'+
         '<div class="fc-ico">\ud83d\udcc1</div>'+
         '<div class="fc-acts">'+
+          (isAdmP?'<button class="pc-act" onclick="event.stopPropagation();openEditFolder(\''+f.id+'\')" title="Renommer">✏️</button>':'')+
           '<button class="pc-act" onclick="event.stopPropagation();openMovePicker(\''+f.id+'\')" title="D\u00e9placer">\u21f2</button>'+
           '<button class="pc-act" onclick="event.stopPropagation();archiveFolder(\''+f.id+'\')" title="Archiver">\ud83d\udce6</button>'+
           '<button class="pc-act del" onclick="event.stopPropagation();softDeleteFolder(\''+f.id+'\')" title="Supprimer">\u00d7</button>'+
@@ -2236,6 +2248,7 @@ function renderProjects(){
       '<div class="pct">'+
         '<div class="pcico">'+ICOS[i%ICOS.length]+'</div>'+
         '<div class="pc-acts">'+
+          (isAdmP?'<button class="pc-act" onclick="event.stopPropagation();openEditProject(\''+p.id+'\')" title="Modifier">✏️</button>':'')+
           '<button class="pc-act" onclick="event.stopPropagation();openMovePicker(\''+p.id+'\')" title="D\u00e9placer">\u21f2</button>'+
           '<button class="pc-act" onclick="event.stopPropagation();archiveProject(\''+p.id+'\')" title="Archiver">\ud83d\udce6</button>'+
           '<button class="pc-act del" onclick="event.stopPropagation();softDeleteProject(\''+p.id+'\')" title="Supprimer">\u00d7</button>'+
@@ -2516,9 +2529,16 @@ function toggleDone(id){
   const t=S.tasks.find(x=>x.id===id);if(!t)return;
   if(!canEditTask(t)){toast('🔒 Vous ne pouvez pas modifier cette tâche','w');return;}
   if(t.timerRunning)stopTimer(id);
-  t.done=!t.done;t.status=t.done?'done':'inprogress';
-  if(t.done)t.completedAt=Date.now();else t.completedAt=null;
-  save();renderAll();toast(t.done?'✓ Validée !':'Réactivée','s');
+  t.done=!t.done;
+  if(t.done){
+    t.status='done';t.completedAt=Date.now();
+  }else{
+    // Réactivation : retour en « À faire » + compteur remis à zéro
+    t.status='todo';t.completedAt=null;
+    S.tsec=Math.max(0,(S.tsec||0)-(t.elapsed||0));
+    t.elapsed=0;t.timerRunning=false;t.timerStart=null;
+  }
+  save();renderAll();toast(t.done?'✓ Validée !':'↩ Réactivée — remise en « À faire », compteur à zéro','s');
   syncNow();
 }
 function archiveTask(id){
@@ -2532,11 +2552,24 @@ function restoreTask(id){
     t.archived=false;
     t.deleted=false;
     t.done=false;
-    t.status='todo'; // Remet toujours en "À faire" après restauration
+    t.status='todo'; // Remet toujours en « À faire » après restauration
+    t.completedAt=null;
+    S.tsec=Math.max(0,(S.tsec||0)-(t.elapsed||0));
+    t.elapsed=0;t.timerRunning=false;t.timerStart=null;
     save();renderAll();
-    toast('↩ Restaurée — remise en "À faire"','s');
+    toast('↩ Restaurée — remise en « À faire », compteur à zéro','s');
     syncNow();
   }
+}
+function resetTaskTimer(id){
+  const t=S.tasks.find(x=>x.id===id);if(!t)return;
+  if(!(CU&&(CU.role==='admin'||CU.role==='manager'))){toast('🔒 Réservé aux administrateurs et managers','w');return;}
+  if(!confirm('Réinitialiser le compteur de temps de « '+t.name+' » à zéro ?\n\nCette action est irréversible.'))return;
+  if(t.timerRunning)stopTimer(id);
+  S.tsec=Math.max(0,(S.tsec||0)-(t.elapsed||0));
+  t.elapsed=0;t.timerRunning=false;t.timerStart=null;
+  save();renderAll();toast('⏱ Compteur remis à zéro','s');
+  syncNow();
 }
 function softDeleteTask(id){
   const t=S.tasks.find(x=>x.id===id);
@@ -2937,8 +2970,7 @@ function renderAdmin(){
       <div class="admin-card-hd"><div class="admin-card-title">📊 Export des données</div></div>
       <div class="admin-card-body" style="display:flex;flex-direction:column;gap:8px;">
         <button class="btn sm" onclick="exportCSV()">⬇ Export CSV complet</button>
-        <button class="btn sm" onclick="openModal('moSync')" title="Sauvegarder">💾<span class="btn-save-txt"> Sauvegarder</span></button>
-        <button class="btn sm danger" onclick="if(confirm('Réinitialiser toutes les données ?')){localStorage.removeItem('gh_erp');location.reload();}">⚠ Réinitialiser (demo)</button>
+            <button class="btn sm danger" onclick="if(confirm('Réinitialiser toutes les données ?')){localStorage.removeItem('gh_erp');location.reload();}">⚠ Réinitialiser (demo)</button>
       </div>
     </div>
   `;
@@ -3217,6 +3249,9 @@ function applyTaskFieldPerms(){
   // Lien "gérer les modèles" : admin/manager uniquement
   const link=document.getElementById('tplManageLink');
   if(link) link.style.display=isAdm?'':'none';
+  // Bouton « Reset compteur » : admin/manager + tâche existante uniquement
+  const rtBtn=document.getElementById('resetTimerBtn');
+  if(rtBtn){ const editing=!!(document.getElementById('editTaskId')&&document.getElementById('editTaskId').value); rtBtn.style.display=(isAdm&&editing)?'':'none'; }
   // Note explicative (seulement quand le temps est verrouillé par un modèle)
   const note=document.getElementById('mt-perm-note');
   if(note){
@@ -3372,10 +3407,57 @@ function saveTask(){
 }
 function saveProject(){
   const name=document.getElementById('mp-n').value.trim();if(!name){toast('Entrez un nom','e');return;}
+  const _epid=document.getElementById('editProjectId');
+  if(_epid&&_epid.value){
+    const p=S.projects.find(x=>x.id===_epid.value);
+    if(p){ p.name=name; p.client=document.getElementById('mp-c').value.trim(); p.pole=document.getElementById('mp-pole').value; p.dateStart=document.getElementById('mp-ds').value; p.dateEnd=document.getElementById('mp-de').value; p.notes=document.getElementById('mp-notes').value.trim(); }
+    _epid.value='';
+    ['mp-n','mp-c','mp-ds','mp-de','mp-notes'].forEach(id=>document.getElementById(id).value='');
+    save();renderAll();closeModal('moProject');toast('✓ Projet modifié','s');syncNow();
+    return;
+  }
   S.projects.push({id:'p'+Date.now(),name,client:document.getElementById('mp-c').value.trim(),pole:document.getElementById('mp-pole').value,dateStart:document.getElementById('mp-ds').value,dateEnd:document.getElementById('mp-de').value,notes:document.getElementById('mp-notes').value.trim(),parentId:S.curFolder||null,isFolder:false,archived:false,deleted:false,createdAt:Date.now()});
   ['mp-n','mp-c','mp-ds','mp-de','mp-notes'].forEach(id=>document.getElementById(id).value='');
   save();renderAll();closeModal('moProject');toast('✓ Projet créé','s');
   syncNow();
+}
+function openNewFolder(){
+  const e=document.getElementById('editFolderId'); if(e)e.value='';
+  document.getElementById('mf-n').value='';
+  const t=document.querySelector('#moFolder .mt'); if(t)t.textContent='Nouveau dossier';
+  const b=document.querySelector('#moFolder .ma .btn.pri'); if(b)b.textContent='Créer le dossier';
+  openModal('moFolder');
+}
+function openEditFolder(id){
+  if(!(CU&&(CU.role==='admin'||CU.role==='manager'))){toast('🔒 Réservé aux administrateurs et managers','w');return;}
+  const f=S.projects.find(p=>p.id===id); if(!f)return;
+  document.getElementById('editFolderId').value=id;
+  document.getElementById('mf-n').value=f.name||'';
+  const t=document.querySelector('#moFolder .mt'); if(t)t.textContent='Renommer le dossier';
+  const b=document.querySelector('#moFolder .ma .btn.pri'); if(b)b.textContent='Enregistrer';
+  openModal('moFolder');
+}
+function openNewProject(){
+  const e=document.getElementById('editProjectId'); if(e)e.value='';
+  ['mp-n','mp-c','mp-ds','mp-de','mp-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const ps=document.getElementById('mp-pole'); if(ps)ps.value='';
+  const t=document.querySelector('#moProject .mt'); if(t)t.textContent='Nouveau projet';
+  const b=document.querySelector('#moProject .ma .btn.pri'); if(b)b.textContent='Créer';
+  openModal('moProject');
+}
+function openEditProject(id){
+  if(!(CU&&(CU.role==='admin'||CU.role==='manager'))){toast('🔒 Réservé aux administrateurs et managers','w');return;}
+  const p=S.projects.find(x=>x.id===id); if(!p)return;
+  document.getElementById('editProjectId').value=id;
+  document.getElementById('mp-n').value=p.name||'';
+  document.getElementById('mp-c').value=p.client||'';
+  const ps=document.getElementById('mp-pole'); if(ps)ps.value=p.pole||'';
+  document.getElementById('mp-ds').value=p.dateStart||'';
+  document.getElementById('mp-de').value=p.dateEnd||'';
+  document.getElementById('mp-notes').value=p.notes||'';
+  const t=document.querySelector('#moProject .mt'); if(t)t.textContent='Modifier le projet';
+  const b=document.querySelector('#moProject .ma .btn.pri'); if(b)b.textContent='Enregistrer';
+  openModal('moProject');
 }
 function saveUser(){
   const name=document.getElementById('mu-name').value.trim();
@@ -3595,7 +3677,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.9';
+const APP_VERSION = '5.12';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
