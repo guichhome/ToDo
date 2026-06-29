@@ -392,6 +392,16 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 
 .mo{display:none;position:fixed;inset:0;background:var(--ov);z-index:1500;align-items:center;justify-content:center;backdrop-filter:blur(8px);}
 .mo.open{display:flex;}
+.private-mode #nav-dashboard,
+.private-mode #nav-my-tasks,
+.private-mode #nav-stats,
+.private-mode #nav-admin,
+.private-mode #nav-sync,
+.private-mode #polesSection,
+.private-mode #adminLabel{display:none!important;}
+.pc-act.drive{background:rgba(52,168,83,.16)!important;color:#34a853!important;}
+.card-drive{display:inline-flex;align-items:center;gap:5px;margin:8px 0 2px;font-size:11px;color:#34a853;background:rgba(52,168,83,.12);border:1px solid rgba(52,168,83,.35);padding:5px 11px;border-radius:7px;text-decoration:none;font-weight:600;transition:all var(--tr);width:fit-content;}
+.card-drive:hover{background:rgba(52,168,83,.24);border-color:rgba(52,168,83,.6);}
 .mbox{background:var(--sf);border:1px solid var(--bd2);border-radius:14px;padding:24px 22px;width:500px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:var(--shl);animation:mpop .18s ease;}
 .mbox.wide{width:680px;}
 @keyframes mpop{from{transform:scale(.95) translateY(8px);opacity:0}to{transform:scale(1);opacity:1}}
@@ -875,7 +885,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   </div>
   <div class="sbdiv"></div>
   <!-- Poles -->
-  <div class="sb-section">
+  <div class="sb-section" id="polesSection">
     <div class="sb-label">Pôles métier</div>
     <div class="ni" onclick="goPage('pole-arch')" id="nav-pole-arch" data-pole="arch"><span class="ico">📐</span><span class="lbl">Architecture</span><span class="nbg" id="nb-arch">0</span></div>
     <div class="ni" onclick="goPage('pole-compta')" id="nav-pole-compta" data-pole="compta"><span class="ico">💰</span><span class="lbl">Comptabilité</span><span class="nbg" id="nb-compta">0</span></div>
@@ -1090,6 +1100,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
       <div class="fg"><label class="fl">Date fin prévue</label><input type="date" class="fi" id="mp-de"/></div>
     </div>
     <div class="fg"><label class="fl">Notes</label><textarea class="fta" id="mp-notes" placeholder="Description du projet..."></textarea></div>
+    <div class="fg"><label class="fl">🔗 Lien Google Drive</label><input type="url" class="fi" id="mp-drive" placeholder="https://drive.google.com/..."/></div>
     <div class="ma"><button class="btn" onclick="closeModal('moProject')">Annuler</button><button class="btn pri" onclick="saveProject()">Créer</button></div>
   </div>
 </div>
@@ -1100,6 +1111,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     <div class="mt">Nouveau dossier</div>
     <input type="hidden" id="editFolderId"/>
     <div class="fg"><label class="fl">Nom du dossier *</label><input type="text" class="fi" id="mf-n" placeholder="Ex: M. et Mme Dupont"/></div>
+    <div class="fg"><label class="fl">🔗 Lien Google Drive</label><input type="url" class="fi" id="mf-drive" placeholder="https://drive.google.com/..."/></div>
     <div class="ma"><button class="btn" onclick="closeModal('moFolder')">Annuler</button><button class="btn pri" onclick="saveFolder()">Créer le dossier</button></div>
   </div>
 </div>
@@ -1293,6 +1305,8 @@ function enterPrivateMode(uid){
   S.curFolder=null; S.tasks.forEach(function(t){t.timerRunning=false;});
   CU=pu;
   initApp();
+  var _app=document.getElementById('app'); if(_app) _app.classList.add('private-mode');
+  goPage('kanban');
   togglePrivateBadge(true);
   enterHome();
 }
@@ -1301,6 +1315,7 @@ function exitPrivateMode(){
   PRIVATE_MODE=false; PRIVATE_UID=null;
   CU=null; pinBuffer=''; selectedLoginUser=null;
   togglePrivateBadge(false);
+  var _app=document.getElementById('app'); if(_app) _app.classList.remove('private-mode');
   load();
   showScreen('login'); renderLogin();
 }
@@ -1936,7 +1951,7 @@ function renderKanban(){
   // Colonnes de statut (sans "Termin\u00e9" : les t\u00e2ches finies vont dans T\u00e2ches termin\u00e9es)
   const cols=STATUSES;
 
-  if(isAdmin){
+  if(isAdmin && !PRIVATE_MODE){
     board.className='kanban-board swim-mode';
     board.style.cssText='display:block;width:100%;';
     board.innerHTML=renderSwimLane(cols);
@@ -2147,14 +2162,15 @@ function openFolder(id){ S.curFolder=id; renderProjects(); }
 function saveFolder(){
   const name=document.getElementById('mf-n').value.trim();
   if(!name){toast('Entrez un nom','e');return;}
+  var drive=document.getElementById('mf-drive').value.trim();if(drive&&!/^https?:\/\//i.test(drive))drive='https://'+drive;
   const _efid=document.getElementById('editFolderId');
   if(_efid&&_efid.value){
-    const f=S.projects.find(p=>p.id===_efid.value); if(f)f.name=name;
+    const f=S.projects.find(p=>p.id===_efid.value); if(f){f.name=name;f.driveUrl=drive;}
     _efid.value=''; document.getElementById('mf-n').value='';
     save();renderProjects();closeModal('moFolder');syncNow();toast('✓ Dossier renommé','s');
     return;
   }
-  S.projects.push({id:'f'+Date.now(),name,isFolder:true,parentId:S.curFolder||null,archived:false,deleted:false,createdAt:Date.now()});
+  S.projects.push({id:'f'+Date.now(),name,driveUrl:drive,isFolder:true,parentId:S.curFolder||null,archived:false,deleted:false,createdAt:Date.now()});
   document.getElementById('mf-n').value='';
   save();renderProjects();closeModal('moFolder');syncNow();toast('\ud83d\udcc1 Dossier cr\u00e9\u00e9','s');
 }
@@ -2314,7 +2330,7 @@ function renderProjects(){
           '<button class="pc-act del" onclick="event.stopPropagation();softDeleteFolder(\''+f.id+'\')" title="Supprimer">\u00d7</button>'+
         '</div>'+
       '</div>'+
-      '<div class="fc-name">'+esc(f.name)+'</div>'+
+      '<div class="fc-name">'+esc(f.name)+'</div>'+(f.driveUrl?'<a class="card-drive" href="'+esc(f.driveUrl)+'" target="_blank" rel="noopener" onclick="event.stopPropagation();">🔗 Ouvrir le Drive</a>':'')+
       '<div class="fc-info">'+infoTxt+(allTasks.length?' \u00b7 '+doneTasks+'/'+allTasks.length+' t\u00e2ches':'')+'</div>'+
     '</div>';
   });
@@ -2338,6 +2354,7 @@ function renderProjects(){
       '</div>'+
       '<div class="pcn">'+esc(p.name)+'</div>'+
       '<div class="pcc">'+esc(p.client||'\u2014')+(pole?' \u00b7 <span class="pole-badge pole-'+pole.id+'" style="font-size:9px;">'+pole.ico+'</span>':'')+'</div>'+
+      (p.driveUrl?'<a class="card-drive" href="'+esc(p.driveUrl)+'" target="_blank" rel="noopener" onclick="event.stopPropagation();">🔗 Ouvrir le Drive</a>':'')+
       '<div class="pcst">'+
         (ug?'<div class="pcs"><div class="pcd u"></div>'+ug+' urg.</div>':'')+
         (nm?'<div class="pcs"><div class="pcd n"></div>'+nm+' norm.</div>':'')+
@@ -3487,25 +3504,28 @@ function saveTask(){
   save();renderAll();closeModal('moTask');
   syncNow(); // Export immédiat
 }
+function openDrive(id){ var p=S.projects.find(function(x){return x.id===id;}); if(p&&p.driveUrl) window.open(p.driveUrl,'_blank','noopener'); }
 function saveProject(){
   const name=document.getElementById('mp-n').value.trim();if(!name){toast('Entrez un nom','e');return;}
+  var drive=document.getElementById('mp-drive').value.trim();if(drive&&!/^https?:\/\//i.test(drive))drive='https://'+drive;
   const _epid=document.getElementById('editProjectId');
   if(_epid&&_epid.value){
     const p=S.projects.find(x=>x.id===_epid.value);
-    if(p){ p.name=name; p.client=document.getElementById('mp-c').value.trim(); p.pole=document.getElementById('mp-pole').value; p.dateStart=document.getElementById('mp-ds').value; p.dateEnd=document.getElementById('mp-de').value; p.notes=document.getElementById('mp-notes').value.trim(); }
+    if(p){ p.name=name; p.client=document.getElementById('mp-c').value.trim(); p.pole=document.getElementById('mp-pole').value; p.dateStart=document.getElementById('mp-ds').value; p.dateEnd=document.getElementById('mp-de').value; p.notes=document.getElementById('mp-notes').value.trim(); p.driveUrl=drive; }
     _epid.value='';
-    ['mp-n','mp-c','mp-ds','mp-de','mp-notes'].forEach(id=>document.getElementById(id).value='');
+    ['mp-n','mp-c','mp-ds','mp-de','mp-notes','mp-drive'].forEach(id=>document.getElementById(id).value='');
     save();renderAll();closeModal('moProject');toast('✓ Projet modifié','s');syncNow();
     return;
   }
-  S.projects.push({id:'p'+Date.now(),name,client:document.getElementById('mp-c').value.trim(),pole:document.getElementById('mp-pole').value,dateStart:document.getElementById('mp-ds').value,dateEnd:document.getElementById('mp-de').value,notes:document.getElementById('mp-notes').value.trim(),parentId:S.curFolder||null,isFolder:false,archived:false,deleted:false,createdAt:Date.now()});
-  ['mp-n','mp-c','mp-ds','mp-de','mp-notes'].forEach(id=>document.getElementById(id).value='');
+  S.projects.push({id:'p'+Date.now(),name,client:document.getElementById('mp-c').value.trim(),pole:document.getElementById('mp-pole').value,dateStart:document.getElementById('mp-ds').value,dateEnd:document.getElementById('mp-de').value,notes:document.getElementById('mp-notes').value.trim(),driveUrl:drive,parentId:S.curFolder||null,isFolder:false,archived:false,deleted:false,createdAt:Date.now()});
+  ['mp-n','mp-c','mp-ds','mp-de','mp-notes','mp-drive'].forEach(id=>document.getElementById(id).value='');
   save();renderAll();closeModal('moProject');toast('✓ Projet créé','s');
   syncNow();
 }
 function openNewFolder(){
   const e=document.getElementById('editFolderId'); if(e)e.value='';
   document.getElementById('mf-n').value='';
+  var _mfd=document.getElementById('mf-drive'); if(_mfd)_mfd.value='';
   const t=document.querySelector('#moFolder .mt'); if(t)t.textContent='Nouveau dossier';
   const b=document.querySelector('#moFolder .ma .btn.pri'); if(b)b.textContent='Créer le dossier';
   openModal('moFolder');
@@ -3515,13 +3535,14 @@ function openEditFolder(id){
   const f=S.projects.find(p=>p.id===id); if(!f)return;
   document.getElementById('editFolderId').value=id;
   document.getElementById('mf-n').value=f.name||'';
+  var _mfd2=document.getElementById('mf-drive'); if(_mfd2)_mfd2.value=f.driveUrl||'';
   const t=document.querySelector('#moFolder .mt'); if(t)t.textContent='Renommer le dossier';
   const b=document.querySelector('#moFolder .ma .btn.pri'); if(b)b.textContent='Enregistrer';
   openModal('moFolder');
 }
 function openNewProject(){
   const e=document.getElementById('editProjectId'); if(e)e.value='';
-  ['mp-n','mp-c','mp-ds','mp-de','mp-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['mp-n','mp-c','mp-ds','mp-de','mp-notes','mp-drive'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const ps=document.getElementById('mp-pole'); if(ps)ps.value='';
   const t=document.querySelector('#moProject .mt'); if(t)t.textContent='Nouveau projet';
   const b=document.querySelector('#moProject .ma .btn.pri'); if(b)b.textContent='Créer';
@@ -3537,6 +3558,7 @@ function openEditProject(id){
   document.getElementById('mp-ds').value=p.dateStart||'';
   document.getElementById('mp-de').value=p.dateEnd||'';
   document.getElementById('mp-notes').value=p.notes||'';
+  var _mpd=document.getElementById('mp-drive'); if(_mpd)_mpd.value=p.driveUrl||'';
   const t=document.querySelector('#moProject .mt'); if(t)t.textContent='Modifier le projet';
   const b=document.querySelector('#moProject .ma .btn.pri'); if(b)b.textContent='Enregistrer';
   openModal('moProject');
@@ -3759,7 +3781,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.15';
+const APP_VERSION = '5.18';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
@@ -3795,7 +3817,8 @@ const WIDGETS=[
 ];
 function renderWidgets(){
   var g=document.getElementById('widgetGrid'); if(!g)return;
-  g.innerHTML=WIDGETS.map(function(w){
+  var WLIST=PRIVATE_MODE?WIDGETS.filter(function(w){return w.id==='tasks'||w.id==='notes';}):WIDGETS;
+  g.innerHTML=WLIST.map(function(w){
     var style='--wc:'+w.color+';--wc-bg:'+w.bg+';';
     if(w.active) return '<div class="widget" style="'+style+'" onclick="openWidget(\''+w.id+'\')"><div class="w-ico">'+w.ico+'</div><div class="w-name">'+esc(w.name)+'</div><div class="w-desc">'+esc(w.desc)+'</div><div class="w-go">Ouvrir →</div></div>';
     return '<div class="widget soon" style="'+style+'"><span class="w-badge">Bientôt</span><div class="w-ico">'+w.ico+'</div><div class="w-name">'+esc(w.name)+'</div><div class="w-desc">'+esc(w.desc)+'</div><div class="w-go">En préparation</div></div>';
