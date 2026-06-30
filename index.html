@@ -818,6 +818,14 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .admin-mode .sbdiv{display:none!important;}
 .admin-mode #adminSection{display:block;}
 .admin-mode .h-right .btn.pri.sm{display:none!important;}
+
+/* Widget Statistiques : sidebar dédiée (Statistiques + Déconnexion) */
+.stats-mode #mainSection .ni:not(#nav-stats){display:none!important;}
+.stats-mode #mainSection .sb-label{display:none!important;}
+.stats-mode #polesSection,
+.stats-mode #adminSection,
+.stats-mode .sbdiv{display:none!important;}
+.stats-mode .h-right .btn.pri.sm{display:none!important;}
 </style>
 <link href="https://fonts.cdnfonts.com/css/d-din" rel="stylesheet">
 <style>
@@ -1488,7 +1496,7 @@ function save(){
     templates:S.templates,
     notifications:S.notifications,
     tsec:S.tsec,surl:S.surl,theme:S.theme,
-    sidebarOpen:S.sidebarOpen,
+    sidebarOpen:S.sidebarOpen,history:S.history,
   }));
   if(S.surl){
     _savePending = true; // Bloque checkTimestamp pendant l'export
@@ -1527,6 +1535,7 @@ function load(){
       notifications:d.notifications||[],
       tsec:d.tsec||0,surl:d.surl||DEFAULT_SURL||'',theme:d.theme||'dark',
       sidebarOpen:d.sidebarOpen!==undefined?d.sidebarOpen:true,
+      history:Array.isArray(d.history)?d.history:[],
     });
     S.curFolder=null;
     S.tasks.forEach(t=>t.timerRunning=false);
@@ -1544,6 +1553,7 @@ function load(){
       seedDemo();
     }
   }
+  backfillHistory();
 }
 function seedUsersOnly(){
   // Utilisateurs par défaut sans données de démo
@@ -1817,7 +1827,7 @@ async function silentImport(){if(PRIVATE_MODE)return;
       templates:S.templates,
       notifications:S.notifications,
       tsec:S.tsec,surl:S.surl,theme:S.theme,
-      sidebarOpen:S.sidebarOpen,
+      sidebarOpen:S.sidebarOpen,history:S.history,
     }));
     renderAll();
     console.log('[Sync] OK:',d.projects.length,'projets,',d.tasks.filter(t=>!t.deleted&&!t.archived&&!t.done).length,'actives');
@@ -2765,12 +2775,12 @@ function toggleDone(id){
   if(t.timerRunning)stopTimer(id);
   t.done=!t.done;
   if(t.done){
-    t.status='done';t.completedAt=Date.now();
+    t.status='done';t.completedAt=Date.now();recordCompletion(t);
   }else{
     // Réactivation : retour en « À faire » + compteur remis à zéro
     t.status='todo';t.completedAt=null;
     S.tsec=Math.max(0,(S.tsec||0)-(t.elapsed||0));
-    t.elapsed=0;t.timerRunning=false;t.timerStart=null;
+    t.elapsed=0;t.timerRunning=false;t.timerStart=null;unrecordCompletion(t.id);
   }
   save();renderAll();toast(t.done?'✓ Validée !':'↩ Réactivée — remise en « À faire », compteur à zéro','s');
   syncNow();
@@ -2969,8 +2979,40 @@ function hardDeleteTask(id){if(!confirm('Supprimer définitivement cette tâche 
 function emptyTrash(){S.tasks=S.tasks.filter(t=>!t.deleted);S.projects=S.projects.filter(p=>!p.deleted);save();renderArchive();renderSidebar();toast('Corbeille vidée','e');syncNow();}
 
 // ── STATS ──
+function recordCompletion(t){
+  if(!t) return;
+  S.history = S.history || [];
+  var rec={id:t.id,name:t.name,project:t.project||null,pole:t.pole||null,
+    assignees:(t.assignees||[]).slice(),elapsed:t.elapsed||0,estimate:t.estimate||0,
+    quantity:t.quantity||0,unit:t.unit||null,templateId:t.templateId||null,
+    priority:t.priority||'normal',completedAt:t.completedAt||Date.now(),createdBy:t.createdBy||null};
+  var i=S.history.findIndex(function(h){return h.id===t.id;});
+  if(i>=0) S.history[i]=rec; else S.history.push(rec);
+}
+function unrecordCompletion(id){
+  if(!S.history) return;
+  S.history=S.history.filter(function(h){return h.id!==id;});
+}
+function backfillHistory(){
+  S.history=S.history||[];
+  var byId={}; S.history.forEach(function(h){byId[h.id]=true;});
+  (S.tasks||[]).forEach(function(t){
+    if(t.done&&!t.deleted){ recordCompletion(t); }
+    else if(!t.done&&byId[t.id]){ unrecordCompletion(t.id); }
+  });
+}
+function ghostTasksFromHistory(){
+  S.history=S.history||[];
+  var live={}; (S.tasks||[]).forEach(function(t){live[t.id]=true;});
+  return S.history.filter(function(h){return !live[h.id];}).map(function(h){
+    return {id:h.id,name:h.name,project:h.project,pole:h.pole,assignees:h.assignees||[],
+      elapsed:h.elapsed||0,estimate:h.estimate||0,quantity:h.quantity||0,unit:h.unit,
+      templateId:h.templateId,priority:h.priority||'normal',done:true,archived:false,
+      deleted:false,status:'done',completedAt:h.completedAt,timerRunning:false,_ghost:true};
+  });
+}
 function renderStats(){
-  const tasks=S.tasks.filter(t=>!t.deleted);
+  const tasks=S.tasks.filter(t=>!t.deleted).concat(ghostTasksFromHistory());
   const active=tasks.filter(t=>!t.done&&!t.archived);
   const done=tasks.filter(t=>t.done);
   const grid=document.getElementById('statsGrid');
@@ -3921,7 +3963,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.29';
+const APP_VERSION = '5.30';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
@@ -3949,6 +3991,7 @@ renderColorPicker(AVATAR_COLORS[0]);
 // ═══ PLATEFORME : SPLASH + PAGE D'ACCUEIL À WIDGETS ═══
 const WIDGETS=[
   {id:'tasks',name:'Tâches',desc:'Gestion des tâches, Kanban & suivi du temps',ico:'🗂️',color:'#d4873a',bg:'#faf1e8',active:true},
+  {id:'stats',name:'Statistiques',desc:'Rendements, temps & performance',ico:'📈',color:'#7c3aed',bg:'#f1ecfb',active:true},
   {id:'quotes',name:'Devis',desc:'Création et suivi des devis clients',ico:'📄',color:'#3a7bd4',bg:'#e8f0fa',active:false},
   {id:'clients',name:'Clients',desc:"Carnet d'adresses et historique clients",ico:'👥',color:'#5fa85f',bg:'#ecf7ec',active:false},
   {id:'planning',name:'Planning',desc:'Agenda chantiers & équipe',ico:'📅',color:'#c0504e',bg:'#faecec',active:false},
@@ -3990,19 +4033,27 @@ function openWidget(id){
   var app=document.getElementById('app');
   if(id==='admin'){
     if(!(CU&&CU.role==='admin')){ if(typeof toast==='function')toast('Réservé aux administrateurs','w'); return; }
-    if(app)app.classList.add('admin-mode');
+    if(app){app.classList.remove('stats-mode');app.classList.add('admin-mode');}
     setAppBrand('Administration');
     showScreen('app');
     if(typeof applySidebarState==='function') applySidebarState();
     goPage('admin');
     return;
   }
+  if(id==='stats'){
+    if(app){app.classList.remove('admin-mode');app.classList.add('stats-mode');}
+    setAppBrand('Statistiques');
+    showScreen('app');
+    if(typeof applySidebarState==='function') applySidebarState();
+    goPage('stats');
+    return;
+  }
   if(id==='tasks'){
-    if(app)app.classList.remove('admin-mode');
+    if(app)app.classList.remove('admin-mode','stats-mode');
     setAppBrand('Tâches');
     showScreen('app');
     if(typeof applySidebarState==='function') applySidebarState();
-    var pg=(S.cur && S.cur!=='admin')?S.cur:'dashboard';
+    var pg=(S.cur && S.cur!=='admin'&&S.cur!=='stats')?S.cur:'dashboard';
     if(typeof goPage==='function') goPage(pg);
   }
 }
