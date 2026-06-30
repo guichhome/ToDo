@@ -633,8 +633,8 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .tlc-grip:hover{opacity:1 !important;color:var(--brand);}
 .tlc-grip:active{cursor:grabbing;}
 .tlc-dragging{opacity:.4;border-style:dashed;}
-.tlc-drop-above{box-shadow:0 -3px 0 -1px var(--brand);}
-.tlc-drop-below{box-shadow:0 3px 0 -1px var(--brand);}
+.tlc-drop-above{box-shadow:0 -3px 0 0 var(--brand);}
+.tlc-drop-below{box-shadow:0 3px 0 0 var(--brand);}
 /* Mobile : grip toujours visible pour faciliter le touch */
 @media(max-width:600px){
   .tlc-grip{opacity:.4;}
@@ -802,6 +802,14 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   .perf-val{min-width:90px;font-size:11px;}
   .perf-detail{margin-left:0;}
 }
+
+/* #6 — header mobile : badge espace privé = icône seule, ne déborde plus */
+@media(max-width:700px){
+  .h-mid{overflow:hidden;gap:6px;}
+  .h-mid .bc{flex:0 1 auto;min-width:0;}
+  #privBadge{flex-shrink:0;font-size:11px!important;padding:3px 7px!important;margin-left:6px!important;}
+  #privBadge .pb-txt{display:none;}
+}
 </style>
 </head>
 <body>
@@ -854,7 +862,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     <div class="h-logo-text"><b style="color:var(--brand);">Tâches</b></div>
   </div>
   <div class="h-mid">
-    <div class="bc" id="bc"><span class="cur">Dashboard</span></div><span id="privBadge" style="display:none;margin-left:10px;font-size:11px;font-family:'JetBrains Mono',monospace;background:#16a085;color:#fff;padding:3px 9px;border-radius:20px;font-weight:600;white-space:nowrap;">🔒 Espace privé</span>
+    <div class="bc" id="bc"><span class="cur">Dashboard</span></div><span id="privBadge" style="display:none;margin-left:10px;font-size:11px;font-family:'JetBrains Mono',monospace;background:#16a085;color:#fff;padding:3px 9px;border-radius:20px;font-weight:600;white-space:nowrap;">🔒<span class="pb-txt"> Espace privé</span></span>
   </div>
   <div class="h-right">
     <button class="hbtn" onclick="goHome()" title="Accueil" id="homeBtn">🏠</button>
@@ -2199,12 +2207,11 @@ function taskDragOver(e,id){
   if(!el)return;
   const rect=el.getBoundingClientRect();
   const below=e.clientY>(rect.top+rect.height/2);
-  el.classList.remove('tlc-drop-above','tlc-drop-below');
+  document.querySelectorAll('.tlc-drop-above,.tlc-drop-below').forEach(function(x){x.classList.remove('tlc-drop-above','tlc-drop-below');});
   el.classList.add(below?'tlc-drop-below':'tlc-drop-above');
 }
 function taskDragLeave(e,id){
-  const el=document.getElementById('tc-'+id);
-  if(el)el.classList.remove('tlc-drop-above','tlc-drop-below');
+  /* La barre orange est geree uniquement par taskDragOver : on ne retire rien ici, sinon elle clignote quand le curseur passe sur les elements enfants de la carte. Le nettoyage final se fait dans taskDragEnd/taskDrop. */
 }
 function taskDrop(e,targetId){
   e.preventDefault();
@@ -2940,9 +2947,9 @@ function renderArchive(){
   }
 }
 function restoreProject(id){const p=S.projects.find(x=>x.id===id);if(p){p.archived=false;p.deleted=false;S.tasks.forEach(t=>{if(t._archWith===id){t.archived=false;t._archWith=null;}});save();renderAll();toast('↩ Projet et ses tâches restaurés','s');syncNow();}}
-function hardDeleteProject(id){if(!confirm('Supprimer définitivement ce projet ET toutes ses tâches ?\n\nCette action est irréversible.'))return;S.projects=S.projects.filter(p=>p.id!==id);S.tasks=S.tasks.filter(t=>t.project!==id);save();renderArchive();toast('Projet supprimé définitivement','e');syncNow();}
-function hardDeleteTask(id){if(!confirm('Supprimer définitivement cette tâche ?\n\nCette action est irréversible.'))return;S.tasks=S.tasks.filter(t=>t.id!==id);save();renderArchive();toast('Tâche supprimée définitivement','e');syncNow();}
-function emptyTrash(){S.tasks=S.tasks.filter(t=>!t.deleted);S.projects=S.projects.filter(p=>!p.deleted);save();renderArchive();toast('Corbeille vidée','e');syncNow();}
+function hardDeleteProject(id){if(!confirm('Supprimer définitivement ce projet ET toutes ses tâches ?\n\nCette action est irréversible.'))return;S.projects=S.projects.filter(p=>p.id!==id);S.tasks=S.tasks.filter(t=>t.project!==id);save();renderArchive();renderSidebar();toast('Projet supprimé définitivement','e');syncNow();}
+function hardDeleteTask(id){if(!confirm('Supprimer définitivement cette tâche ?\n\nCette action est irréversible.'))return;S.tasks=S.tasks.filter(t=>t.id!==id);save();renderArchive();renderSidebar();toast('Tâche supprimée définitivement','e');syncNow();}
+function emptyTrash(){S.tasks=S.tasks.filter(t=>!t.deleted);S.projects=S.projects.filter(p=>!p.deleted);save();renderArchive();renderSidebar();toast('Corbeille vidée','e');syncNow();}
 
 // ── STATS ──
 function renderStats(){
@@ -3897,7 +3904,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.23';
+const APP_VERSION = '5.26';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
