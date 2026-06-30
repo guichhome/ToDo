@@ -810,6 +810,14 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   #privBadge{flex-shrink:0;font-size:11px!important;padding:3px 7px!important;margin-left:6px!important;}
   #privBadge .pb-txt{display:none;}
 }
+
+/* Widget Administration : Admin + Synchro sortis du widget Tâches */
+#adminSection{display:none;}
+.admin-mode #mainSection,
+.admin-mode #polesSection,
+.admin-mode .sbdiv{display:none!important;}
+.admin-mode #adminSection{display:block;}
+.admin-mode .h-right .btn.pri.sm{display:none!important;}
 </style>
 </head>
 <body>
@@ -859,7 +867,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 <header>
   <div class="h-logo" onclick="toggleSidebar()" id="hLogo" title="Menu">
     <img id="hdrLogo" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="G"/>
-    <div class="h-logo-text"><b style="color:var(--brand);">Tâches</b></div>
+    <div class="h-logo-text"><b style="color:var(--brand);" id="appBrand">Tâches</b></div>
   </div>
   <div class="h-mid">
     <div class="bc" id="bc"><span class="cur">Dashboard</span></div><span id="privBadge" style="display:none;margin-left:10px;font-size:11px;font-family:'JetBrains Mono',monospace;background:#16a085;color:#fff;padding:3px 9px;border-radius:20px;font-weight:600;white-space:nowrap;">🔒<span class="pb-txt"> Espace privé</span></span>
@@ -879,7 +887,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 
 <aside id="sidebar">
   <!-- Dashboard -->
-  <div class="sb-section">
+  <div class="sb-section" id="mainSection">
     <div class="sb-label">Principal</div>
     <div class="ni act" onclick="goPage('dashboard')" id="nav-dashboard"><span class="ico">📊</span><span class="lbl">Dashboard</span></div>
     <div class="ni" onclick="goPage('kanban')" id="nav-kanban"><span class="ico">🗂</span><span class="lbl">Kanban</span><span class="nbg" id="nb-kanban">0</span></div>
@@ -902,11 +910,14 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     <div class="ni" onclick="goPage('pole-commercial')" id="nav-pole-commercial" data-pole="commercial"><span class="ico">🤝</span><span class="lbl">Commercial</span><span class="nbg" id="nb-commercial">0</span></div>
   </div>
   <div class="sbdiv"></div>
-  <!-- Admin -->
-  <div class="sb-section">
+  <!-- Admin (déplacé dans le widget Administration) -->
+  <div class="sb-section" id="adminSection">
     <div class="sb-label" id="adminLabel">Admin</div>
     <div class="ni" onclick="goPage('admin')" id="nav-admin"><span class="ico">🛡</span><span class="lbl">Administration</span></div>
     <div class="ni" onclick="openSyncSettings()" id="nav-sync"><span class="ico">☁️</span><span class="lbl">Synchronisation</span></div>
+  </div>
+  <!-- Déconnexion : toujours visible -->
+  <div class="sb-section" id="logoutSection">
     <div class="ni" onclick="logout()" id="nav-logout"><span class="ico">🚪</span><span class="lbl">Déconnexion</span></div>
   </div>
 </aside>
@@ -1318,6 +1329,7 @@ function enterPrivateMode(uid){
   var _app=document.getElementById('app'); if(_app) _app.classList.add('private-mode');
   goPage('kanban');
   togglePrivateBadge(true);
+  setAppBrand('Tâches');
   enterHome();
   privateSyncOnEnter();
   startPrivatePoll();
@@ -3904,7 +3916,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.26';
+const APP_VERSION = '5.28';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
@@ -3936,11 +3948,12 @@ const WIDGETS=[
   {id:'clients',name:'Clients',desc:"Carnet d'adresses et historique clients",ico:'👥',color:'#5fa85f',bg:'#ecf7ec',active:false},
   {id:'planning',name:'Planning',desc:'Agenda chantiers & équipe',ico:'📅',color:'#c0504e',bg:'#faecec',active:false},
   {id:'stock',name:'Stock',desc:'Inventaire matériaux & fournitures',ico:'📦',color:'#9b59b6',bg:'#f3ecf7',active:false},
-  {id:'billing',name:'Facturation',desc:'Factures & encaissements',ico:'💶',color:'#16a085',bg:'#e8f6f3',active:false}
+  {id:'billing',name:'Facturation',desc:'Factures & encaissements',ico:'💶',color:'#16a085',bg:'#e8f6f3',active:false},
+  {id:'admin',name:'Administration',desc:'Utilisateurs, synchronisation & réglages',ico:'🛡️',color:'#64748b',bg:'#eef1f5',active:true,adminOnly:true}
 ];
 function renderWidgets(){
   var g=document.getElementById('widgetGrid'); if(!g)return;
-  var WLIST=PRIVATE_MODE?WIDGETS.filter(function(w){return w.id==='tasks'||w.id==='notes';}):WIDGETS;
+  var WLIST=PRIVATE_MODE?WIDGETS.filter(function(w){return w.id==='tasks'||w.id==='notes';}):WIDGETS.filter(function(w){return !w.adminOnly||(CU&&CU.role==='admin');});
   g.innerHTML=WLIST.map(function(w){
     var style='--wc:'+w.color+';--wc-bg:'+w.bg+';';
     if(w.active) return '<div class="widget" style="'+style+'" onclick="openWidget(\''+w.id+'\')"><div class="w-ico">'+w.ico+'</div><div class="w-name">'+esc(w.name)+'</div><div class="w-desc">'+esc(w.desc)+'</div><div class="w-go">Ouvrir →</div></div>';
@@ -3967,11 +3980,25 @@ function showScreen(name){
   else if(name==='splash'){ var s=document.getElementById('splashScreen'); if(s)s.style.display='flex'; }
 }
 function enterHome(){ renderHome(); showScreen('home'); }
+function setAppBrand(t){var b=document.getElementById("appBrand");if(b)b.textContent=t||"Tâches";}
 function openWidget(id){
-  if(id==='tasks'){
+  var app=document.getElementById('app');
+  if(id==='admin'){
+    if(!(CU&&CU.role==='admin')){ if(typeof toast==='function')toast('Réservé aux administrateurs','w'); return; }
+    if(app)app.classList.add('admin-mode');
+    setAppBrand('Administration');
     showScreen('app');
     if(typeof applySidebarState==='function') applySidebarState();
-    if(S.cur && typeof renderPage==='function') renderPage(S.cur);
+    goPage('admin');
+    return;
+  }
+  if(id==='tasks'){
+    if(app)app.classList.remove('admin-mode');
+    setAppBrand('Tâches');
+    showScreen('app');
+    if(typeof applySidebarState==='function') applySidebarState();
+    var pg=(S.cur && S.cur!=='admin')?S.cur:'dashboard';
+    if(typeof goPage==='function') goPage(pg);
   }
 }
 function goHome(){ renderHome(); showScreen('home'); }
