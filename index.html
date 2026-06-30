@@ -1785,6 +1785,7 @@ async function silentImport(){if(PRIVATE_MODE)return;
       };
     });
     if(d.tsec!==undefined) S.tsec=d.tsec;
+    mergeUsersFromSheet(d.users);
     // Sauvegarde locale sans re-déclencher l'export
     localStorage.setItem('gh_erp',JSON.stringify({
       users:S.users,tasks:S.tasks,projects:S.projects,
@@ -1800,6 +1801,23 @@ async function silentImport(){if(PRIVATE_MODE)return;
 
 function notifyTimestampUpdate(ts){ _lastKnownTs=ts; }
 
+function mergeUsersFromSheet(arr){
+  if(!Array.isArray(arr)) return;
+  arr.forEach(su=>{
+    if(!su||!su.id) return;
+    const lu=S.users.find(x=>x.id===su.id);
+    if(lu){
+      if(su.name!==undefined) lu.name=su.name;
+      if(su.initials!==undefined) lu.initials=su.initials;
+      if(su.role!==undefined) lu.role=su.role;
+      if(su.pole!==undefined) lu.pole=su.pole;
+      if(su.color!==undefined) lu.color=su.color;
+    } else {
+      const nu=Object.assign({}, su); if(!nu.pin) nu.pin=''; S.users.push(nu);
+    }
+  });
+  if(CU){ const me=S.users.find(x=>x.id===CU.id); if(me){ CU.name=me.name; CU.initials=me.initials; CU.role=me.role; CU.pole=me.pole; CU.color=me.color; } }
+}
 async function autoImportOnStart(){if(PRIVATE_MODE)return;
   if(!S.surl){ console.log('[Import] Pas d URL Sheets'); return; }
   console.log('[Import] Démarrage depuis:', S.surl.slice(0,60)+'...');
@@ -1848,6 +1866,7 @@ async function autoImportOnStart(){if(PRIVATE_MODE)return;
       };
     });
     if(d.tsec !== undefined) S.tsec = d.tsec;
+    mergeUsersFromSheet(d.users);
 
     save();
     renderAll();
@@ -3801,6 +3820,7 @@ async function impSheets(url){
     let np=0,nt=0;
     (d.projects||[]).forEach(p=>{if(!S.projects.find(x=>x.id===p.id)){S.projects.push(p);np++;}});
     (d.tasks||[]).forEach(t=>{if(!S.tasks.find(x=>x.id===t.id)){S.tasks.push(t);nt++;}});
+    mergeUsersFromSheet(d.users);
     save();renderAll();
     toast('✓ '+np+' projet(s) et '+nt+' tâche(s) importés','s');
     addNotif('Sync Sheets','Import réussi: '+np+' projets, '+nt+' tâches','s');
@@ -3877,7 +3897,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.22';
+const APP_VERSION = '5.23';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
