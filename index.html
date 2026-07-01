@@ -826,6 +826,32 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .stats-mode #adminSection,
 .stats-mode .sbdiv{display:none!important;}
 .stats-mode .h-right .btn.pri.sm{display:none!important;}
+
+/* ===== Dashboard Statistiques ===== */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
+@media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr);}}
+.kpi{background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:11px 13px;}
+.kpi-v{font-size:21px;font-weight:700;color:var(--tx);line-height:1.05;font-family:'D-DIN',monospace;}
+.kpi-l{font-size:10px;color:var(--tx2);margin-top:4px;text-transform:uppercase;letter-spacing:.03em;}
+.kpi-s{font-size:10px;color:var(--tx4);margin-top:2px;}
+.trend2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+@media(max-width:760px){.trend2{grid-template-columns:1fr;}}
+.trend-cap{font-size:11px;color:var(--tx2);text-align:center;margin-bottom:6px;}
+.trend-chart{display:flex;align-items:flex-end;gap:5px;height:120px;}
+.trend-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:100%;justify-content:flex-end;min-width:0;}
+.trend-bar-wrap{width:100%;flex:1;display:flex;align-items:flex-end;}
+.trend-bar{width:100%;border-radius:3px 3px 0 0;min-height:2px;transition:height .6s;}
+.trend-x{font-size:9px;color:var(--tx4);height:11px;}
+.trend-v{font-size:9px;color:var(--tx3);font-family:'D-DIN',monospace;}
+.st-table{width:100%;border-collapse:collapse;font-size:12px;}
+.st-table th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--tx3);padding:6px 8px;border-bottom:1px solid var(--bd);font-weight:600;white-space:nowrap;}
+.st-table td{padding:7px 8px;border-bottom:1px solid var(--bd);color:var(--tx);white-space:nowrap;}
+.st-table tbody tr:last-child td{border-bottom:none;}
+.st-num{text-align:right;font-family:'D-DIN',monospace;}
+.st-line{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd);}
+.st-line:last-child{border-bottom:none;}
+.st-line-name{font-size:12px;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+@media(max-width:680px){.stats-two{grid-template-columns:1fr !important;}}
 </style>
 <link href="https://fonts.cdnfonts.com/css/d-din" rel="stylesheet">
 <style>
@@ -2985,7 +3011,7 @@ function recordCompletion(t){
   var rec={id:t.id,name:t.name,project:t.project||null,pole:t.pole||null,
     assignees:(t.assignees||[]).slice(),elapsed:t.elapsed||0,estimate:t.estimate||0,
     quantity:t.quantity||0,unit:t.unit||null,templateId:t.templateId||null,
-    priority:t.priority||'normal',completedAt:t.completedAt||Date.now(),createdBy:t.createdBy||null};
+    priority:t.priority||'normal',completedAt:t.completedAt||Date.now(),createdBy:t.createdBy||null,createdAt:t.createdAt||null,dateStart:t.dateStart||null,dateEnd:t.dateEnd||null};
   var i=S.history.findIndex(function(h){return h.id===t.id;});
   if(i>=0) S.history[i]=rec; else S.history.push(rec);
 }
@@ -3008,201 +3034,177 @@ function ghostTasksFromHistory(){
     return {id:h.id,name:h.name,project:h.project,pole:h.pole,assignees:h.assignees||[],
       elapsed:h.elapsed||0,estimate:h.estimate||0,quantity:h.quantity||0,unit:h.unit,
       templateId:h.templateId,priority:h.priority||'normal',done:true,archived:false,
-      deleted:false,status:'done',completedAt:h.completedAt,timerRunning:false,_ghost:true};
+      deleted:false,status:'done',completedAt:h.completedAt,createdAt:h.createdAt||null,dateStart:h.dateStart||null,dateEnd:h.dateEnd||null,timerRunning:false,_ghost:true};
   });
 }
 function renderStats(){
-  const tasks=S.tasks.filter(t=>!t.deleted).concat(ghostTasksFromHistory());
-  const active=tasks.filter(t=>!t.done&&!t.archived);
-  const done=tasks.filter(t=>t.done);
   const grid=document.getElementById('statsGrid');
+  if(!grid) return;
+  const now=Date.now(), DAY=86400000, WEEK=7*DAY;
+  const E=(typeof esc==='function')?esc:function(x){return x;};
+  const F=fmt;
+  const first=function(n){return (n||'').split(' ')[0];};
+  const fmtDelay=function(ms){var d=ms/DAY;return d<1?Math.round(ms/3600000)+' h':(d<10?d.toFixed(1):Math.round(d))+' j';};
 
-  // Variables globales manquantes dans la réécriture
-  let totalSec = 0;
-  tasks.forEach(t => { totalSec += (t.elapsed||0); });
-  S.tasks.forEach(t => { if(t.timerRunning&&t.timerStart) totalSec += Math.floor((Date.now()-t.timerStart)/1000); });
+  const ghosts=ghostTasksFromHistory();
+  const live=S.tasks.filter(function(t){return !t.deleted;});
+  const all=live.concat(ghosts);
+  const active=live.filter(function(t){return !t.done&&!t.archived;});
+  const done=all.filter(function(t){return t.done;});
 
-  // ── Project progress chart ──
-  const activeProjs=S.projects.filter(p=>!p.archived&&!p.deleted);
-  let projRows='';
-  activeProjs.forEach((p,pi)=>{
-    const pt=tasks.filter(t=>t.project===p.id&&!t.archived);
-    const tot=pt.length,dn=pt.filter(t=>t.done).length;
-    const inp=pt.filter(t=>!t.done&&t.status==='inprogress').length;
-    const todo=tot-dn-inp;
-    const pct=tot?Math.round(dn/tot*100):0;
-    const pole=POLES.find(x=>x.id===p.pole);
-    const pSec=pt.reduce((a,t)=>a+t.elapsed,0);
-    const dnW=tot?Math.round(dn/tot*100):0;
-    const inpW=tot?Math.round(inp/tot*100):0;
-    const todW=tot?Math.round(todo/tot*100):0;
-    const pctColor=pct===100?'var(--ok)':pct>50?'var(--brand)':'var(--tx3)';
-    if(pi>0)projRows+='<div style="height:1px;background:var(--bd);margin:4px 0;"></div>';
-    projRows+=
-      '<div style="margin-bottom:12px;">'+
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">'+
-          '<div style="display:flex;align-items:center;gap:8px;">'+
-            '<span style="font-size:13px;font-weight:600;color:var(--tx);">'+p.name+'</span>'+
-            (pole?'<span class="badge pole-'+pole.id+'" style="font-size:9px;">'+pole.ico+' '+pole.label+'</span>':'')+
-          '</div>'+
-          '<div style="display:flex;gap:10px;align-items:center;">'+
-            '<span style="font-size:10px;color:var(--tx3);font-family:D-DIN,monospace;">'+fmt(pSec)+'</span>'+
-            '<span style="font-family:D-DIN,monospace;font-size:12px;font-weight:700;color:'+pctColor+';">'+pct+'%</span>'+
-          '</div>'+
-        '</div>'+
-        '<div style="height:12px;background:var(--bd);border-radius:6px;overflow:hidden;display:flex;">'+
-          '<div style="height:100%;background:var(--ok);width:'+dnW+'%;transition:width .8s;"></div>'+
-          '<div style="height:100%;background:var(--brand);width:'+inpW+'%;transition:width .8s .1s;"></div>'+
-          '<div style="height:100%;background:var(--bd2);width:'+todW+'%;"></div>'+
-        '</div>'+
-        '<div style="display:flex;gap:12px;margin-top:4px;font-size:10px;font-family:D-DIN,monospace;">'+
-          '<span style="color:var(--ok);">✅ '+dn+' terminée'+(dn>1?'s':'')+'</span>'+
-          '<span style="color:var(--brand);">▶ '+inp+' en cours</span>'+
-          '<span style="color:var(--tx4);">○ '+todo+' à faire</span>'+
-        '</div>'+
-      '</div>';
-  });
-  const legend=
-    '<div style="display:flex;gap:16px;margin-top:10px;padding-top:10px;border-top:1px solid var(--bd);">'+
-    '<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--tx3);"><div style="width:12px;height:8px;border-radius:2px;background:var(--ok);"></div>Terminées</div>'+
-    '<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--tx3);"><div style="width:12px;height:8px;border-radius:2px;background:var(--brand);"></div>En cours</div>'+
-    '<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--tx3);"><div style="width:12px;height:8px;border-radius:2px;background:var(--bd2);"></div>À faire</div>'+
-    '</div>';
-  const projChart='<div class="stat-block" style="grid-column:1/-1;"><h3>🏗 Avancement des projets</h3>'+
-    (activeProjs.length?projRows+legend:'<div class="empty" style="padding:20px;"><div class="ei">🏗</div><h3>Aucun projet</h3></div>')+
-    '</div>';
+  var totalSec=0; all.forEach(function(t){totalSec+=(t.elapsed||0);});
+  S.tasks.forEach(function(t){ if(t.timerRunning&&t.timerStart) totalSec+=Math.floor((now-t.timerStart)/1000); });
+  var since30=now-30*DAY, since7=now-7*DAY;
+  var done30=done.filter(function(t){return t.completedAt&&t.completedAt>=since30;});
+  var done7=done.filter(function(t){return t.completedAt&&t.completedAt>=since7;});
+  var sec30=done30.reduce(function(a,t){return a+(t.elapsed||0);},0);
 
-  const blocks=[
-    {
-      title:'📊 Vue globale',
-      rows:[
-        ['Total tâches',tasks.length],['Actives',active.length],['Terminées',done.length],
-        ['Archivées',tasks.filter(t=>t.archived&&!t.deleted).length],
-        ['Taux de complétion',tasks.length?Math.round(done.length/tasks.length*100)+'%':'0%'],
-        ['Temps total chronométré',fmt(totalSec)],
-        ['Projets actifs',S.projects.filter(p=>!p.archived&&!p.deleted).length],
-      ]
-    },
-    {
-      title:'🔴 Urgences',
-      rows:[
-        ['Urgentes actives',active.filter(t=>t.priority==='urgent').length],
-        ['Urgentes terminées',done.filter(t=>t.priority==='urgent').length],
-        ['Normales actives',active.filter(t=>t.priority==='normal').length],
-        ['Taux urgence',active.length?Math.round(active.filter(t=>t.priority==='urgent').length/active.length*100)+'%':'0%'],
-      ]
-    },
-    {
-      title:'👥 Par utilisateur',
-      rows:S.users.map(u=>{
-        const ut=tasks.filter(t=>t.assignees&&t.assignees.includes(u.id));
-        const udon=ut.filter(t=>t.done).length;
-        const usec=ut.reduce((a,t)=>a+t.elapsed,0);
-        return [u.name.split(' ')[0],ut.length+' tâches · '+udon+' faites · '+fmt(usec)];
-      })
-    },
-    {
-      title:'🏗 Par pôle (barres)',
-      chart:true,
-      rows:POLES.map(pole=>{
-        const pt=tasks.filter(t=>t.pole===pole.id);
-        const pdon=pt.filter(t=>t.done).length;
-        const pct=pt.length?Math.round(pdon/pt.length*100):0;
-        return {label:pole.ico+' '+pole.label,total:pt.length,done:pdon,pct,color:'var('+pole.color+')',active:pt.filter(t=>!t.done).length};
-      })
-    },
-  ];
-  // ═══ RENDEMENTS PAR MODÈLE + PERFORMANCE ═══
-  const doneT=tasks.filter(t=>t.done);
-  const unitLbl={ml:'ml',m2:'m\u00b2',u:'u',h:'h'};
+  var wd=done.filter(function(t){return t.createdAt&&t.completedAt&&t.completedAt>=t.createdAt;});
+  var avgDelay=wd.length?wd.reduce(function(a,t){return a+(t.completedAt-t.createdAt);},0)/wd.length:0;
 
-  // Rendements par modèle (groupé par template puis par utilisateur)
-  const byTpl={};
-  doneT.forEach(t=>{ if(t.templateId){(byTpl[t.templateId]=byTpl[t.templateId]||[]).push(t);} });
-  let yieldHtml='';
-  Object.keys(byTpl).forEach(tplId=>{
-    const tpl=(S.templates||[]).find(x=>x.id===tplId);
-    if(!tpl)return;
-    const byUser={};
-    byTpl[tplId].forEach(t=>{ (t.assignees||[]).forEach(uid=>{
-      const d=byUser[uid]=byUser[uid]||{qty:0,time:0,count:0,est:0};
-      d.qty+=(t.quantity||0);d.time+=(t.elapsed||0);d.count++;d.est+=(t.estimate||0);
-    });});
-    // Trier par rendement (plus rapide d'abord) si quantité, sinon par temps moyen
-    let rows=Object.keys(byUser).map(uid=>{
-      const u=S.users.find(x=>x.id===uid);
-      const d=byUser[uid];
-      const minPerUnit=d.qty>0?((d.time/60)/d.qty):null;
-      const avgMin=d.count>0?(d.time/60/d.count):0;
-      return {u,d,minPerUnit,avgMin};
-    }).filter(r=>r.u);
-    // Tri : par rendement croissant (rapide) si dispo, sinon temps moyen croissant
-    const hasQty=rows.some(r=>r.minPerUnit!=null);
-    rows.sort((a,b)=>{
-      if(hasQty)return (a.minPerUnit==null?9e9:a.minPerUnit)-(b.minPerUnit==null?9e9:b.minPerUnit);
-      return a.avgMin-b.avgMin;
-    });
-    let userRows='';
-    rows.forEach((r,i)=>{
-      const fast=i===0&&rows.length>1;
-      const slow=i===rows.length-1&&rows.length>1;
-      const tag=fast?'<span class="yield-tag fast">\u26a1 rapide</span>':(slow?'<span class="yield-tag slow">\ud83d\udc0c lent</span>':'');
-      const yieldTxt=r.minPerUnit!=null?'<b>'+r.minPerUnit.toFixed(1)+'</b> min/'+(unitLbl[tpl.unit]||'u'):'<b>'+Math.round(r.avgMin)+'</b> min/t\u00e2che';
-      const detail=(r.d.qty>0?r.d.qty+' '+(unitLbl[tpl.unit]||'u')+' \u00b7 ':'')+fmt(r.d.time)+' \u00b7 '+r.d.count+' t\u00e2che'+(r.d.count>1?'s':'');
-      userRows+='<div class="yield-user">'+
-        '<div class="yield-u-left"><span class="kc-av" style="background:'+r.u.color+'">'+r.u.initials+'</span><span class="yield-uname">'+esc(r.u.name.split(' ')[0])+'</span>'+tag+'</div>'+
-        '<div class="yield-u-right"><div class="yield-val">'+yieldTxt+'</div><div class="yield-detail">'+detail+'</div></div>'+
-      '</div>';
-    });
-    yieldHtml+='<div class="yield-tpl">'+
-      '<div class="yield-tpl-hd"><span class="yield-tpl-name">'+esc(tpl.name)+'</span>'+
-      '<span class="yield-tpl-est">estim\u00e9 '+(tpl.estimate||'?')+' min'+(tpl.unit?' \u00b7 '+unitLbl[tpl.unit]:'')+'</span></div>'+
-      userRows+
-    '</div>';
-  });
-  const yieldBlock='<div class="stat-block" style="grid-column:1/-1;"><h3>\ud83c\udfaf Rendements par type de t\u00e2che</h3>'+
-    (yieldHtml||'<div style="color:var(--tx4);font-size:13px;padding:14px 0;text-align:center;">Aucune t\u00e2che termin\u00e9e cr\u00e9\u00e9e depuis un mod\u00e8le avec quantit\u00e9. Cr\u00e9ez des t\u00e2ches depuis vos mod\u00e8les et renseignez les quantit\u00e9s pour voir les rendements.</div>')+
+  var estDone=done.filter(function(t){return t.estimate>0&&t.elapsed>0;});
+  var estRatio=0;
+  if(estDone.length){var se=estDone.reduce(function(a,t){return a+t.estimate;},0);var sr=estDone.reduce(function(a,t){return a+t.elapsed/60;},0);estRatio=se>0?Math.round(sr/se*100):0;}
+
+  var overdue=active.filter(function(t){return t.dateEnd&&new Date(t.dateEnd).getTime()<now;});
+  var urg=active.filter(function(t){return t.priority==='urgent';});
+  var complRate=(done.length+active.length)?Math.round(done.length/(done.length+active.length)*100):0;
+
+  function kpi(l,v,s,c){return '<div class="kpi"><div class="kpi-v"'+(c?' style="color:'+c+'"':'')+'>'+v+'</div><div class="kpi-l">'+l+'</div>'+(s?'<div class="kpi-s">'+s+'</div>':'')+'</div>';}
+  var estC=estDone.length?(estRatio<=110?'var(--ok)':estRatio<=130?'var(--warn)':'var(--urgent)'):'';
+  var kpiBlock='<div class="kpi-grid">'+
+    kpi('Temps total',F(totalSec),'30 j : '+F(sec30),'')+
+    kpi('T\u00e2ches termin\u00e9es',done.length,'30 j : '+done30.length,'var(--ok)')+
+    kpi('Taux compl\u00e9tion',complRate+'%',active.length+' actives','')+
+    kpi('D\u00e9lai moyen',wd.length?fmtDelay(avgDelay):'\u2014','cr\u00e9ation \u2192 fin','')+
+    kpi('Pr\u00e9cision estim.',estDone.length?estRatio+'%':'\u2014',estDone.length?(estRatio<=100?'plus rapide que pr\u00e9vu':'d\u00e9passement'):'\u00e0 renseigner',estC)+
+    kpi('En retard',overdue.length,'\u00e9ch\u00e9ance d\u00e9pass\u00e9e',overdue.length?'var(--urgent)':'var(--ok)')+
+    kpi('Charge active',active.length,urg.length+' urgente'+(urg.length>1?'s':''),urg.length?'var(--urgent)':'')+
+    kpi('Cette semaine',done7.length,'termin\u00e9es (7 j)','')+
   '</div>';
 
-  // Performance équipe : réel vs estimé sur tâches terminées
-  let perfRows='';
-  S.users.filter(u=>u.role!=='disabled').forEach(u=>{
-    const ut=doneT.filter(t=>t.assignees&&t.assignees.includes(u.id)&&t.estimate>0);
-    if(!ut.length)return;
-    const estMin=ut.reduce((a,t)=>a+(t.estimate||0),0);
-    const realMin=ut.reduce((a,t)=>a+(t.elapsed||0),0)/60;
-    const ratio=estMin>0?Math.round(realMin/estMin*100):0;
-    const color=ratio<=100?'var(--ok)':(ratio<=120?'var(--warn)':'var(--urgent)');
-    const verdict=ratio<=90?'\u26a1 rapide':(ratio<=110?'\u2713 dans les temps':(ratio<=130?'\u26a0 un peu lent':'\ud83d\udc0c besoin d\'aide'));
-    perfRows+='<div class="perf-row">'+
-      '<div class="perf-u"><span class="kc-av" style="background:'+u.color+'">'+u.initials+'</span>'+esc(u.name.split(' ')[0])+'</div>'+
-      '<div class="perf-bar-wrap"><div class="perf-bar" style="width:'+Math.min(ratio,200)/2+'%;background:'+color+'"></div></div>'+
-      '<div class="perf-val" style="color:'+color+'"><b>'+ratio+'%</b> <span style="font-size:10px;color:var(--tx3);">'+verdict+'</span></div>'+
-    '</div>'+
-    '<div class="perf-detail">estim\u00e9 '+fmt(estMin*60)+' \u00b7 r\u00e9el '+fmt(Math.round(realMin*60))+' \u00b7 '+ut.length+' t\u00e2che'+(ut.length>1?'s':'')+'</div>';
-  });
-  const perfBlock='<div class="stat-block" style="grid-column:1/-1;"><h3>\u26a1 Performance \u00e9quipe (r\u00e9el vs estim\u00e9)</h3>'+
-    (perfRows||'<div style="color:var(--tx4);font-size:13px;padding:14px 0;text-align:center;">Pas encore de t\u00e2ches termin\u00e9es avec estimation. Les comparaisons appara\u00eetront ici.</div>')+
-    '<div style="font-size:10px;color:var(--tx4);margin-top:8px;">100% = pile dans le temps estim\u00e9 \u00b7 moins = plus rapide \u00b7 plus = plus lent</div>'+
-  '</div>';
+  var weeks=[]; for(var i=7;i>=0;i--){var ew=now-i*WEEK;weeks.push({s:ew-WEEK,e:ew,count:0,sec:0});}
+  done.forEach(function(t){ if(!t.completedAt)return; for(var k=0;k<weeks.length;k++){ if(t.completedAt>=weeks[k].s&&t.completedAt<weeks[k].e){weeks[k].count++;weeks[k].sec+=(t.elapsed||0);break;} } });
+  var maxC=Math.max.apply(null,[1].concat(weeks.map(function(w){return w.count;})));
+  var maxS=Math.max.apply(null,[1].concat(weeks.map(function(w){return w.sec;})));
+  function trendChart(field,max,color,isTime){
+    return '<div class="trend-chart">'+weeks.map(function(w,idx){
+      var v=w[field]; var h=Math.max(2,Math.round(v/max*100));
+      var lbl=idx===0?'-8s':(idx===7?'now':'');
+      return '<div class="trend-col" title="'+(isTime?F(w.sec):(w.count+' t\u00e2che(s)'))+'"><div class="trend-v">'+(v>0?(isTime?F(v):v):'')+'</div><div class="trend-bar-wrap"><div class="trend-bar" style="height:'+h+'%;background:'+color+'"></div></div><div class="trend-x">'+lbl+'</div></div>';
+    }).join('')+'</div>';
+  }
+  var trendBlock='<div class="stat-block" style="grid-column:1/-1;"><h3>\ud83d\udcc8 \u00c9volution (8 derni\u00e8res semaines)</h3>'+
+    '<div class="trend2">'+
+      '<div><div class="trend-cap">T\u00e2ches termin\u00e9es / semaine</div>'+trendChart('count',maxC,'var(--ok)',false)+'</div>'+
+      '<div><div class="trend-cap">Temps chronom\u00e9tr\u00e9 / semaine</div>'+trendChart('sec',maxS,'var(--brand)',true)+'</div>'+
+    '</div></div>';
 
-  grid.innerHTML=projChart+yieldBlock+perfBlock+blocks.map(b=>{
-    if(b.chart){
-      return `<div class="stat-block">
-        <h3>${b.title}</h3>
-        <div class="bar-chart">
-          ${b.rows.map(r=>`<div class="bc-row">
-            <div class="bc-label"><span>${r.label}</span><span>${r.done}/${r.total} (${r.pct}%)</span></div>
-            <div class="bc-bar"><div class="bc-fill" style="width:${r.pct}%;background:${r.color}"></div></div>
-          </div>`).join('')}
-        </div>
-      </div>`;
-    }
-    return `<div class="stat-block">
-      <h3>${b.title}</h3>
-      ${b.rows.map(r=>`<div class="stat-row2"><span class="sk">${r[0]}</span><span class="sv">${r[1]}</span></div>`).join('')}
-    </div>`;
+  var activeProjs=S.projects.filter(function(p){return !p.archived&&!p.deleted&&!p.isFolder;});
+  var projRows=activeProjs.map(function(p){
+    var pt=all.filter(function(t){return t.project===p.id&&!t.archived;});
+    var tot=pt.length, dn=pt.filter(function(t){return t.done;}).length;
+    var pct=tot?Math.round(dn/tot*100):0;
+    var pSec=pt.reduce(function(a,t){return a+(t.elapsed||0);},0);
+    var pole=POLES.find(function(x){return x.id===p.pole;});
+    var cli=p.client?'<span style="font-size:10px;color:var(--tx3);">\ud83d\udc64 '+E(p.client)+'</span>':'';
+    var pctC=pct===100?'var(--ok)':pct>50?'var(--brand)':'var(--tx3)';
+    return '<div style="margin-bottom:12px;">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;gap:8px;flex-wrap:wrap;">'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span style="font-size:13px;font-weight:600;">'+E(p.name)+'</span>'+(pole?'<span class="badge pole-'+pole.id+'" style="font-size:9px;">'+pole.ico+' '+pole.label+'</span>':'')+cli+'</div>'+
+        '<div style="display:flex;gap:10px;align-items:center;"><span style="font-size:10px;color:var(--tx3);font-family:D-DIN,monospace;">'+F(pSec)+'</span><span style="font-family:D-DIN,monospace;font-size:12px;font-weight:700;color:'+pctC+';">'+pct+'%</span></div>'+
+      '</div>'+
+      '<div style="height:10px;background:var(--bd);border-radius:5px;overflow:hidden;"><div style="height:100%;background:'+pctC+';width:'+pct+'%;transition:width .8s;"></div></div>'+
+      '<div style="font-size:10px;color:var(--tx4);margin-top:3px;">'+dn+'/'+tot+' t\u00e2ches termin\u00e9es</div>'+
+    '</div>';
   }).join('');
+  var projBlock='<div class="stat-block" style="grid-column:1/-1;"><h3>\ud83c\udfd7 Avancement des projets</h3>'+(activeProjs.length?projRows:'<div style="color:var(--tx4);padding:14px 0;text-align:center;">Aucun projet actif</div>')+'</div>';
+
+  var persRows=S.users.filter(function(u){return u.role!=='disabled';}).map(function(u){
+    var uDone=done.filter(function(t){return t.assignees&&t.assignees.indexOf(u.id)>=0;});
+    var uActive=active.filter(function(t){return t.assignees&&t.assignees.indexOf(u.id)>=0;});
+    var uUrg=uActive.filter(function(t){return t.priority==='urgent';});
+    var uSec=uDone.reduce(function(a,t){return a+(t.elapsed||0);},0);
+    var uAvg=uDone.length?uSec/uDone.length:0;
+    var uEst=uDone.filter(function(t){return t.estimate>0&&t.elapsed>0;});
+    var uRatio=null;
+    if(uEst.length){var ee=uEst.reduce(function(a,t){return a+t.estimate;},0);var rr=uEst.reduce(function(a,t){return a+t.elapsed/60;},0);uRatio=ee>0?Math.round(rr/ee*100):null;}
+    var rC=uRatio==null?'var(--tx4)':(uRatio<=110?'var(--ok)':uRatio<=130?'var(--warn)':'var(--urgent)');
+    return '<tr>'+
+      '<td><span class="kc-av" style="background:'+u.color+';width:22px;height:22px;font-size:9px;vertical-align:middle;margin-left:0;">'+u.initials+'</span> '+E(first(u.name))+'</td>'+
+      '<td class="st-num">'+uActive.length+(uUrg.length?' <span style="color:var(--urgent)">('+uUrg.length+'\ud83d\udd34)</span>':'')+'</td>'+
+      '<td class="st-num">'+uDone.length+'</td>'+
+      '<td class="st-num">'+F(uSec)+'</td>'+
+      '<td class="st-num">'+(uDone.length?F(Math.round(uAvg)):'\u2014')+'</td>'+
+      '<td class="st-num" style="color:'+rC+'">'+(uRatio==null?'\u2014':uRatio+'%')+'</td>'+
+    '</tr>';
+  }).join('');
+  var persBlock='<div class="stat-block" style="grid-column:1/-1;"><h3>\ud83d\udc65 Charge &amp; performance par personne</h3>'+
+    '<div style="overflow-x:auto;"><table class="st-table"><thead><tr><th>Personne</th><th class="st-num">Actives</th><th class="st-num">Faites</th><th class="st-num">Temps</th><th class="st-num">Moy./t\u00e2che</th><th class="st-num">R\u00e9el/estim.</th></tr></thead><tbody>'+persRows+'</tbody></table></div>'+
+    '<div style="font-size:10px;color:var(--tx4);margin-top:8px;">R\u00e9el/estim. : 100% = pile dans les temps \u00b7 moins = plus rapide \u00b7 plus = plus lent</div>'+
+  '</div>';
+
+  var poleData=POLES.map(function(pole){
+    var pt=all.filter(function(t){return t.pole===pole.id;});
+    return {pole:pole,sec:pt.reduce(function(a,t){return a+(t.elapsed||0);},0),done:pt.filter(function(t){return t.done;}).length,active:active.filter(function(t){return t.pole===pole.id;}).length};
+  });
+  var maxPoleSec=Math.max.apply(null,[1].concat(poleData.map(function(r){return r.sec;})));
+  var poleBars=poleData.map(function(r){
+    var w=Math.max(1,Math.round(r.sec/maxPoleSec*100));
+    return '<div class="bc-row"><div class="bc-label"><span>'+r.pole.ico+' '+r.pole.label+'</span><span style="font-family:D-DIN,monospace;font-size:10px;">'+F(r.sec)+' \u00b7 '+r.done+'\u2713 \u00b7 '+r.active+' actives</span></div><div class="bc-bar"><div class="bc-fill" style="width:'+w+'%;background:var('+r.pole.color+')"></div></div></div>';
+  }).join('');
+  var poleBlock='<div class="stat-block" style="grid-column:1/-1;"><h3>\ud83e\ude9a Activit\u00e9 par p\u00f4le (temps investi)</h3><div class="bar-chart">'+poleBars+'</div></div>';
+
+  var byClient={};
+  all.forEach(function(t){
+    var p=S.projects.find(function(x){return x.id===t.project;});
+    var cli=(p&&p.client)?p.client:null; if(!cli)return;
+    var c=byClient[cli]=byClient[cli]||{sec:0,done:0,active:0,projs:{}};
+    c.sec+=(t.elapsed||0); if(t.done)c.done++; if(!t.done&&!t.archived)c.active++; c.projs[t.project]=true;
+  });
+  var cliKeys=Object.keys(byClient).sort(function(a,b){return byClient[b].sec-byClient[a].sec;});
+  var cliRows=cliKeys.map(function(cli){
+    var c=byClient[cli];
+    return '<tr><td>\ud83d\udc64 '+E(cli)+'</td><td class="st-num">'+Object.keys(c.projs).length+'</td><td class="st-num">'+F(c.sec)+'</td><td class="st-num">'+c.done+'</td><td class="st-num">'+c.active+'</td></tr>';
+  }).join('');
+  var cliBlock='<div class="stat-block" style="grid-column:1/-1;"><h3>\ud83e\udd1d Suivi par client</h3>'+
+    (cliKeys.length?'<div style="overflow-x:auto;"><table class="st-table"><thead><tr><th>Client</th><th class="st-num">Projets</th><th class="st-num">Temps</th><th class="st-num">Faites</th><th class="st-num">Actives</th></tr></thead><tbody>'+cliRows+'</tbody></table></div>':'<div style="color:var(--tx4);padding:14px 0;text-align:center;">Aucun client renseign\u00e9 sur les projets</div>')+
+  '</div>';
+
+  var unitLbl={ml:'ml',m2:'m\u00b2',u:'u',h:'h'};
+  var byTpl={}; done.forEach(function(t){ if(t.templateId){(byTpl[t.templateId]=byTpl[t.templateId]||[]).push(t);} });
+  var yieldHtml=Object.keys(byTpl).map(function(tplId){
+    var tpl=(S.templates||[]).find(function(x){return x.id===tplId;}); if(!tpl)return '';
+    var byUser={};
+    byTpl[tplId].forEach(function(t){ (t.assignees||[]).forEach(function(uid){ var d=byUser[uid]=byUser[uid]||{qty:0,time:0,count:0}; d.qty+=(t.quantity||0);d.time+=(t.elapsed||0);d.count++; }); });
+    var rows=Object.keys(byUser).map(function(uid){ var u=S.users.find(function(x){return x.id===uid;}); var d=byUser[uid]; var mpu=d.qty>0?((d.time/60)/d.qty):null; var avg=d.count>0?(d.time/60/d.count):0; return {u:u,d:d,mpu:mpu,avg:avg}; }).filter(function(r){return r.u;});
+    var hasQty=rows.some(function(r){return r.mpu!=null;});
+    rows.sort(function(a,b){ if(hasQty)return (a.mpu==null?9e9:a.mpu)-(b.mpu==null?9e9:b.mpu); return a.avg-b.avg; });
+    var userRows=rows.map(function(r,idx){
+      var fast=idx===0&&rows.length>1, slow=idx===rows.length-1&&rows.length>1;
+      var tag=fast?'<span class="yield-tag fast">\u26a1 rapide</span>':(slow?'<span class="yield-tag slow">\ud83d\udc0c lent</span>':'');
+      var yt=r.mpu!=null?'<b>'+r.mpu.toFixed(1)+'</b> min/'+(unitLbl[tpl.unit]||'u'):'<b>'+Math.round(r.avg)+'</b> min/t\u00e2che';
+      var det=(r.d.qty>0?r.d.qty+' '+(unitLbl[tpl.unit]||'u')+' \u00b7 ':'')+F(r.d.time)+' \u00b7 '+r.d.count+' t\u00e2che'+(r.d.count>1?'s':'');
+      return '<div class="yield-user"><div class="yield-u-left"><span class="kc-av" style="background:'+r.u.color+'">'+r.u.initials+'</span><span class="yield-uname">'+E(first(r.u.name))+'</span>'+tag+'</div><div class="yield-u-right"><div class="yield-val">'+yt+'</div><div class="yield-detail">'+det+'</div></div></div>';
+    }).join('');
+    return '<div class="yield-tpl"><div class="yield-tpl-hd"><span class="yield-tpl-name">'+E(tpl.name)+'</span><span class="yield-tpl-est">estim\u00e9 '+(tpl.estimate||'?')+' min'+(tpl.unit?' \u00b7 '+unitLbl[tpl.unit]:'')+'</span></div>'+userRows+'</div>';
+  }).join('');
+  var yieldBlock='<div class="stat-block" style="grid-column:1/-1;"><h3>\ud83c\udfaf Rendements par type de t\u00e2che</h3>'+(yieldHtml||'<div style="color:var(--tx4);font-size:13px;padding:14px 0;text-align:center;">Cr\u00e9ez des t\u00e2ches depuis vos mod\u00e8les (avec quantit\u00e9s) pour mesurer les rendements min/unit\u00e9.</div>')+'</div>';
+
+  var overdueList=overdue.slice().sort(function(a,b){return new Date(a.dateEnd)-new Date(b.dateEnd);}).slice(0,8).map(function(t){
+    var days=Math.floor((now-new Date(t.dateEnd).getTime())/DAY);
+    return '<div class="st-line"><span class="st-line-name">'+E(t.name)+'</span><span style="color:var(--urgent);font-size:11px;white-space:nowrap;">'+(days<=0?'auj.':'+'+days+' j')+'</span></div>';
+  }).join('');
+  var overdueBlock='<div class="stat-block"><h3>\u23f0 T\u00e2ches en retard</h3>'+(overdue.length?overdueList:'<div style="color:var(--ok);padding:14px 0;text-align:center;">\u2705 Aucun retard</div>')+'</div>';
+
+  var recent=done.filter(function(t){return t.completedAt;}).sort(function(a,b){return b.completedAt-a.completedAt;}).slice(0,8).map(function(t){
+    var d=new Date(t.completedAt); var ds=d.getDate()+'/'+(d.getMonth()+1);
+    return '<div class="st-line"><span class="st-line-name">'+E(t.name)+'</span><span style="color:var(--tx4);font-size:11px;font-family:D-DIN,monospace;white-space:nowrap;">'+F(t.elapsed||0)+' \u00b7 '+ds+'</span></div>';
+  }).join('');
+  var recentBlock='<div class="stat-block"><h3>\ud83d\udccb Derni\u00e8res t\u00e2ches termin\u00e9es</h3>'+(recent?recent:'<div style="color:var(--tx4);padding:14px 0;text-align:center;">Aucune t\u00e2che termin\u00e9e</div>')+'</div>';
+
+  grid.innerHTML=kpiBlock+trendBlock+projBlock+persBlock+poleBlock+cliBlock+yieldBlock+
+    '<div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="stats-two">'+overdueBlock+recentBlock+'</div>';
 }
 
 // ── ADMIN ──
@@ -3963,7 +3965,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.30';
+const APP_VERSION = '5.31';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
