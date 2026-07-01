@@ -392,7 +392,6 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 
 .mo{display:none;position:fixed;inset:0;background:var(--ov);z-index:1500;align-items:center;justify-content:center;backdrop-filter:blur(8px);}
 .mo.open{display:flex;}
-.private-mode #nav-dashboard,
 .private-mode #nav-my-tasks,
 .private-mode #nav-stats,
 .private-mode #nav-admin,
@@ -857,6 +856,13 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 <style>
 /* DIN (test) — secours jsDelivr si cdnfonts indisponible */
 @font-face{font-family:'D-DIN';src:url('https://cdn.jsdelivr.net/gh/Altinn/altinn-cdn@master/fonts/d-din/D-DIN.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap;}
+
+/* ── PERSO ÉPURÉ (point 5) ── */
+.private-mode .tlc-av,.private-mode .kc-avatar{display:none!important;}
+.private-mode .tlc-time,.private-mode .ttime,.private-mode .tvs,.private-mode .test{display:none!important;}
+.private-mode #polesSection{display:none!important;}
+.private-mode #nav-stats{display:none!important;}
+.private-mode .fg:has(#polePicker),.private-mode .fg:has(#mt-est){display:none!important;}
 </style>
 </head>
 <body>
@@ -1393,7 +1399,7 @@ function enterPrivateMode(uid){
   CU=pu;
   initApp();
   var _app=document.getElementById('app'); if(_app) _app.classList.add('private-mode');
-  goPage('kanban');
+  goPage('dashboard');
   togglePrivateBadge(true);
   setAppBrand('Tâches');
   enterHome();
@@ -1412,6 +1418,7 @@ function exitPrivateMode(){
   showScreen('login'); renderLogin();
 }
 function openPrivateAccess(){
+  migratePrivateToMain();
   var pus=getPrivateUsers();
   var c=document.getElementById('privCreate'), l=document.getElementById('privLogin');
   if(c) c.style.display=pus.length?'none':'block';
@@ -1420,13 +1427,35 @@ function openPrivateAccess(){
   openModal('moPrivate');
   setTimeout(function(){ var f=document.getElementById(pus.length?'priv-loginpin':'priv-name'); if(f)f.focus(); },120);
 }
+function migratePrivateToMain(){
+  var list=getPrivateUsers();
+  if(!list.length) return;
+  var olds=list.filter(function(u){return u.id!=='priv_main';});
+  if(!olds.length) return;
+  var mainKey=privateDataKey('priv_main');
+  var md={}; try{ md=JSON.parse(localStorage.getItem(mainKey)||'{}'); }catch(e){}
+  var accT=md.tasks||[], accP=md.projects||[], accTpl=md.templates||[], accNotif=md.notifications||[];
+  var accTsec=md.tsec||0, accTs=md.ts||0, refUser=null;
+  function mergeInto(acc,arr){ var byId={}; (acc||[]).forEach(function(x){byId[x.id]=x;}); (arr||[]).forEach(function(x){ if(!byId[x.id]||(x._upd||0)>(byId[x.id]._upd||0)) byId[x.id]=x; }); return Object.keys(byId).map(function(k){return byId[k];}); }
+  olds.forEach(function(o){
+    var d={}; try{ d=JSON.parse(localStorage.getItem(privateDataKey(o.id))||'{}'); }catch(e){}
+    accT=mergeInto(accT,d.tasks); accP=mergeInto(accP,d.projects); accTpl=mergeInto(accTpl,d.templates);
+    accTsec=Math.max(accTsec,d.tsec||0); accTs=Math.max(accTs,d.ts||0);
+    if(!accNotif.length) accNotif=d.notifications||[];
+    if(!refUser) refUser=o;
+  });
+  try{ localStorage.setItem(mainKey, JSON.stringify({tasks:accT,projects:accP,templates:accTpl,notifications:accNotif,tsec:accTsec,ts:accTs})); }catch(e){}
+  var mainUser=list.find(function(u){return u.id==='priv_main';});
+  if(!mainUser){ mainUser={id:'priv_main',name:(refUser&&refUser.name)||'Perso',initials:(refUser&&refUser.initials)||'PE',role:'admin',pole:'',color:(refUser&&refUser.color)||'#16a085',pin:(refUser&&refUser.pin)||'0000',private:true}; }
+  setPrivateUsers([mainUser]);
+}
 function createPrivateUser(){
   var name=((document.getElementById('priv-name').value)||'').trim()||'Perso';
   var pin=document.getElementById('priv-pin').value;
   var pin2=document.getElementById('priv-pin2').value;
   if(!/^[0-9]{4}$/.test(pin)){ toast('Choisis un code à 4 chiffres','e'); return; }
   if(pin!==pin2){ toast('Les deux codes ne correspondent pas','e'); return; }
-  var uid='priv'+Date.now();
+  var uid='priv_main';
   var pu={id:uid,name:name,initials:name.slice(0,2).toUpperCase(),role:'admin',pole:'',color:'#16a085',pin:pin,private:true};
   var list=getPrivateUsers(); list.push(pu); setPrivateUsers(list);
   closeModal('moPrivate');
@@ -1640,6 +1669,45 @@ function seedDemo(){
 }
 
 // ── TIMER ──
+function parseTimeInput(str){
+  str=(str||'').trim().toLowerCase().replace(',','.');
+  if(!str) return null;
+  var sec=null;
+  if(str.indexOf(':')>=0){
+    var p=str.split(':');
+    var h=parseInt(p[0]||'0',10), mi=parseInt(p[1]||'0',10), se=parseInt(p[2]||'0',10);
+    if(isNaN(h)||isNaN(mi)) return null;
+    sec=h*3600+mi*60+(isNaN(se)?0:se);
+  } else if(str.indexOf('h')>=0){
+    var parts=str.split('h');
+    var hh=parseInt(parts[0]||'0',10), mm=parseInt(parts[1]||'0',10);
+    if(isNaN(hh)) return null;
+    sec=hh*3600+(isNaN(mm)?0:mm)*60;
+  } else {
+    var mins=parseFloat(str);
+    if(isNaN(mins)) return null;
+    sec=Math.round(mins*60);
+  }
+  if(sec===null||sec<0||sec>3600000) return null;
+  return sec;
+}
+function editTaskTime(id){
+  var t=S.tasks.find(function(x){return x.id===id;}); if(!t) return;
+  if(!canEditTask(t)){toast('👁 Vous ne pouvez pas modifier cette tâche','w');return;}
+  var cur=t.elapsed||0;
+  var curStr=Math.floor(cur/3600)+'h'+String(Math.floor((cur%3600)/60)).padStart(2,'0');
+  var input=prompt('Temps passé sur « '+t.name+' »\n\nFormats : 1h30  ·  90 (minutes)  ·  1:30:00',curStr);
+  if(input===null) return;
+  var sec=parseTimeInput(input);
+  if(sec===null){toast('Format non reconnu (ex : 1h30, 90, 1:30:00)','e');return;}
+  if(t.timerRunning)stopTimer(id);
+  var old=t.elapsed||0;
+  t.elapsed=sec;
+  S.tsec=Math.max(0,(S.tsec||0)-old+sec);
+  if(t.done)recordCompletion(t);
+  save();renderAll();toast('⏱ Temps réglé : '+fmt(sec),'s');
+  if(!PRIVATE_MODE && typeof syncNow==='function') syncNow();
+}
 function startTimer(id){
   const t=S.tasks.find(x=>x.id===id);
   if(!t||t.done||t.deleted)return;
@@ -1652,14 +1720,19 @@ function startTimer(id){
   S.tasks.forEach(x=>{
     if(x.timerRunning&&x.id!==id&&x.assignees&&x.assignees.some(a=>_tUsers.includes(a)))stopTimer(x.id);
   });
-  t.timerRunning=true;t.timerStart=Date.now();
+  if(ivs[id]){clearInterval(ivs[id]);delete ivs[id];}
+  if(!t.timerRunning){t.timerRunning=true;t.timerStart=Date.now();}
+  else if(!t.timerStart){t.timerStart=Date.now();}
   if(t.status==='todo'){t.status='inprogress';}
-  ivs[id]=setInterval(()=>{
-    const ex=Math.floor((Date.now()-t.timerStart)/1000),tot=t.elapsed+ex;
+  var _h=setInterval(()=>{
+    const cur=S.tasks.find(x=>x.id===id);
+    if(!cur||!cur.timerRunning||!cur.timerStart){clearInterval(_h);if(ivs[id]===_h)delete ivs[id];return;}
+    const ex=Math.floor((Date.now()-cur.timerStart)/1000),tot=(cur.elapsed||0)+ex;
     ['td-'+id,'gtd-'+id].forEach(eid=>{const e=document.getElementById(eid);if(e){e.textContent=fmt(tot);e.style.color='var(--brand)';}});
-    ['vs-'+id,'gvs-'+id].forEach(eid=>vsEl(eid,tot,t.estimate));
+    ['vs-'+id,'gvs-'+id].forEach(eid=>vsEl(eid,tot,cur.estimate));
     updTodayTime();
   },1000);
+  ivs[id]=_h;
   save();renderAll();toast('⏱ Chrono démarré','i');
 }
 function stopTimer(id){
@@ -2054,11 +2127,12 @@ function renderDashboard(){
     {ico:'📋',val:active.length,lbl:'Tâches actives',sub:urgent.length+' urgentes',color:'var(--brand)',link:'all'},
     {ico:'✅',val:done.length,lbl:'Terminées',sub:'voir le détail',color:'var(--ok)',link:'done'},
     {ico:'🔴',val:urgent.length,lbl:'Urgentes',sub:'à traiter',color:'var(--urgent)',link:'urgent'},
-    {ico:'⏱',val:running.length>0?'▶ '+running.length:fmt(todayT),lbl:running.length>0?'Timer actif':'Temps aujourd\'hui',sub:'',color:'var(--info)',id:'kpi-time-wrap'},
+    {ico:'⏱',val:running.length>0?'▶ '+running.length:fmt(todayT),lbl:running.length>0?'Timer actif':'Temps aujourd\'hui',sub:'',color:'var(--info)',id:'kpi-time-wrap',hidePriv:true},
     {ico:'🏗',val:S.projects.filter(p=>!p.archived&&!p.deleted).length,lbl:'Projets actifs',sub:'',color:'var(--warn)',link:'projects'},
-    {ico:'👥',val:S.users.filter(u=>u.role!=='disabled').length,lbl:'Utilisateurs',sub:'actifs',color:'var(--arch)',link:CU&&CU.role==='admin'?'admin':null},
+    {ico:'👥',val:S.users.filter(u=>u.role!=='disabled').length,lbl:'Utilisateurs',sub:'actifs',color:'var(--arch)',link:CU&&CU.role==='admin'?'admin':null,hidePriv:true},
   ];
-  document.getElementById('kpiGrid').innerHTML=kpis.map(k=>{
+  var kpisList=PRIVATE_MODE?kpis.filter(function(k){return !k.hidePriv;}):kpis;
+  document.getElementById('kpiGrid').innerHTML=kpisList.map(k=>{
     const clickable=k.link?'kpi-clickable':'';
     const onclick=k.link?'onclick="goPage(\''+k.link+'\')"':'';
     const valId=k.id?'id="kpi-time"':'';
@@ -2256,7 +2330,7 @@ function swimDrop(e,status,userId){
     t.assignees=[userId]; // r\u00e9assigne \u00e0 l'utilisateur de la ligne
     if(status==='inprogress'&&prevStatus!=='inprogress'&&!t.timerRunning){startTimer(t.id);}
     else if((status==='done'||status==='waiting'||status==='cancelled'||status==='todo')&&t.timerRunning){stopTimer(t.id);}
-    if(status==='done'){t.done=true;t.completedAt=Date.now();}else{t.done=false;t.completedAt=null;}
+    if(status==='done'){t.done=true;t.completedAt=Date.now();recordCompletion(t);}else{if(t.done)unrecordCompletion(t.id);t.done=false;t.completedAt=null;}
     save();syncNow();renderKanban();renderSidebar();
     const un=S.users.find(u=>u.id===userId);
     if(status==='done'){toast('\u2705 Termin\u00e9e','s');}
@@ -2732,10 +2806,11 @@ function tcardLine(t,arch){
 
   // Boutons
   let btns='';
-  if(isTimerUser&&!t.done){
+  if(isTimerUser&&!t.done&&!PRIVATE_MODE){
     btns+=t.timerRunning
       ?'<button class="tlc-btn stop" onclick="event.stopPropagation();stopTimer(\''+t.id+'\')" title="Stop">⏹</button>'
       :'<button class="tlc-btn play" onclick="event.stopPropagation();startTimer(\''+t.id+'\')" title="Démarrer">▶</button>';
+    btns+='<button class="tlc-btn" onclick="event.stopPropagation();editTaskTime(\''+t.id+'\')" title="Saisir le temps">✏</button>';
   }
   if(editable&&t.done&&!arch) btns+='<button class="tlc-btn" onclick="event.stopPropagation();archiveTask(\''+t.id+'\')" title="Archiver">📦</button>';
   if(arch&&CU&&(CU.role==='admin'||CU.role==='manager')) btns+='<button class="tlc-btn" onclick="event.stopPropagation();restoreTask(\''+t.id+'\')" title="Restaurer">↩</button>';
@@ -2782,11 +2857,12 @@ function tcard(t,arch,showProj,compact){
 
   // Timer controls
   let timerBtns='';
-  if(isTimerUser&&!t.done){
+  if(isTimerUser&&!t.done&&!PRIVATE_MODE){
     timerBtns+=t.timerRunning
       ?'<button class="tbt stop" onclick="event.stopPropagation();stopTimer(\''+t.id+'\')">⏹</button>'
       :'<button class="tbt play" onclick="event.stopPropagation();startTimer(\''+t.id+'\')">▶</button>';
     timerBtns+='<button class="tbt" onclick="event.stopPropagation();resetTimer(\''+t.id+'\')">↺</button>';
+    timerBtns+='<button class="tbt" onclick="event.stopPropagation();editTaskTime(\''+t.id+'\')" title="Saisir le temps">✏</button>';
   }
   if(editable&&t.done&&!arch) timerBtns+='<button class="tbt arch" onclick="event.stopPropagation();archiveTask(\''+t.id+'\')">📦</button>';
   if(arch&&CU&&(CU.role==='admin'||CU.role==='manager')) timerBtns+='<button class="tbt" onclick="event.stopPropagation();restoreTask(\''+t.id+'\')">↩</button>';
@@ -3226,8 +3302,13 @@ function renderStats(){
   }).join('');
   var recentBlock='<div class="stat-block"><h3>\ud83d\udccb Derni\u00e8res t\u00e2ches termin\u00e9es</h3>'+(recent?recent:'<div style="color:var(--tx4);padding:14px 0;text-align:center;">Aucune t\u00e2che termin\u00e9e</div>')+'</div>';
 
-  grid.innerHTML=kpiBlock+trendBlock+projBlock+persBlock+poleBlock+cliBlock+yieldBlock+
+  var _statsFull=!!(document.getElementById('app')&&document.getElementById('app').classList.contains('stats-mode'));
+  if(_statsFull){
+    grid.innerHTML=kpiBlock+trendBlock+projBlock+persBlock+poleBlock+cliBlock+yieldBlock+
     '<div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="stats-two">'+overdueBlock+recentBlock+'</div>';
+  } else {
+    grid.innerHTML=projBlock;
+  }
 }
 
 // ── ADMIN ──
@@ -3988,7 +4069,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.34';
+const APP_VERSION = '5.38';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
