@@ -1931,6 +1931,7 @@ async function silentImport(){if(PRIVATE_MODE)return;
     if(!valid){ console.warn('[Sync] Données invalides ignorées'); return; }
 
     // Remplacement avec préservation des timers actifs
+    if((!d.projects||!d.projects.length) && (!d.tasks||!d.tasks.length)){ return; } // GARDE : cloud vide -> garder local
     S.projects = d.projects;
     if(Array.isArray(d.templates)) S.templates = d.templates;
     S.tasks = d.tasks.map(t=>{
@@ -3953,6 +3954,7 @@ async function doSync(){if(PRIVATE_MODE){toast("🔒 Synchro désactivée en esp
 }
 async function expSheets(url, silent=false){if(PRIVATE_MODE)return;
   if(!url){if(!silent)toast('URL Sheets non configurée','e');return;}
+  if(silent && (((S.tasks&&S.tasks.length)||0)+((S.projects&&S.projects.length)||0))===0){ console.warn('[Sync] Envoi vide bloqué (anti-effacement)'); return; }
   if(!silent) toast('Sauvegarde vers Sheets...','i');
   try{
     const ts=Date.now();
@@ -4069,7 +4071,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.38';
+const APP_VERSION = '5.39';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
