@@ -1346,6 +1346,32 @@ async function syncNow(){
 function getPrivateUsers(){ try{ return JSON.parse(localStorage.getItem('gh_private_users')||'[]'); }catch(e){ return []; } }
 function setPrivateUsers(list){ try{ localStorage.setItem('gh_private_users', JSON.stringify(list)); }catch(e){} }
 function privateDataKey(uid){ return 'gh_private_data_'+uid; }
+function _privTombItem(it){ if(!it) return; it._tomb=true; it.deleted=true; it.archived=false; it.notes=''; it._upd=Date.now(); }
+function _privHash(it){ return JSON.stringify(it,function(k,v){return (k==='_upd'||k==='timerRunning'||k==='timerStart')?undefined:v;}); }
+function _privReshadow(){ S._shadow={}; (S.tasks||[]).concat(S.projects||[]).concat(S.templates||[]).forEach(function(it){ if(it&&it.id) S._shadow[it.id]=_privHash(it); }); }
+function _privBumpUpd(){ S._shadow=S._shadow||{}; (S.tasks||[]).concat(S.projects||[]).concat(S.templates||[]).forEach(function(it){ if(!it||!it.id) return; var h=_privHash(it); if(S._shadow[it.id]!==h){ it._upd=Date.now(); S._shadow[it.id]=h; } }); }
+function _privSig(){ var s=0,n=0; (S.tasks||[]).forEach(function(t){s+=(t._upd||0);n++;}); (S.projects||[]).forEach(function(p){s+=(p._upd||0);n++;}); return n+':'+s; }
+function _privMerge(localArr,cloudArr,isTasks){
+  var out={};
+  (localArr||[]).forEach(function(it){ if(it&&it.id) out[it.id]={it:it}; });
+  (cloudArr||[]).forEach(function(c){
+    if(!c||!c.id) return;
+    var ex=out[c.id];
+    if(!ex){ out[c.id]={it:c}; return; }
+    var lu=ex.it._upd||0, cu=c._upd||0;
+    if(cu>lu){
+      if(isTasks){
+        var loc=ex.it;
+        out[c.id]={it:Object.assign({},c,{
+          elapsed:(loc&&loc.timerRunning)?Math.max(c.elapsed||0,loc.elapsed||0):(c.elapsed||0),
+          timerRunning:(loc&&loc.timerRunning)||false,
+          timerStart:(loc&&loc.timerStart)||null
+        })};
+      } else { out[c.id]={it:c}; }
+    }
+  });
+  return Object.keys(out).map(function(k){return out[k].it;});
+}
 function savePrivateData(){
   if(!PRIVATE_UID) return;
   try{ localStorage.setItem(privateDataKey(PRIVATE_UID), JSON.stringify({
@@ -1363,6 +1389,7 @@ function enterPrivateMode(uid){
   S.tasks=d.tasks||[]; S.projects=d.projects||[]; S.templates=d.templates||[];
   S.notifications=d.notifications||[]; S.tsec=d.tsec||0;
   S.curFolder=null; S.tasks.forEach(function(t){t.timerRunning=false;});
+  _privReshadow();
   CU=pu;
   initApp();
   var _app=document.getElementById('app'); if(_app) _app.classList.add('private-mode');
@@ -1433,6 +1460,7 @@ function setupPrivateGesture(){
 function privateSurlGet(){ return PRIVATE_SURL || localStorage.getItem('gh_private_surl') || DEFAULT_PRIVATE_SURL; }
 function schedulePrivateExport(){ if(_privExportTimer) clearTimeout(_privExportTimer); _privExportTimer=setTimeout(function(){ privateExport(true); }, 1500); }
 async function privateExport(silent){
+  if(silent && (((S.tasks&&S.tasks.length)||0)+((S.projects&&S.projects.length)||0))===0) return;
   var url=privateSurlGet(); if(!url){ if(!silent) toast('Lien de synchro privé non configuré','w'); return; }
   try{
     var u=CU?Object.assign({},CU):null; if(u) delete u.pin;
@@ -1448,32 +1476,27 @@ async function privateImport(silent){
     var d=await r.json(); if(!d.success) return;
     if(!Array.isArray(d.projects)||!Array.isArray(d.tasks)) return;
     if(!d.tasks.every(function(t){return t.id&&t.name!==undefined;})) return;
-    S.projects=d.projects;
-    if(Array.isArray(d.templates)) S.templates=d.templates;
-    S.tasks=d.tasks.map(function(t){ var loc=S.tasks.find(function(x){return x.id===t.id;}); return Object.assign({},t,{elapsed:Math.max(t.elapsed||0,(loc&&loc.elapsed)||0),timerRunning:(loc&&loc.timerRunning)||false,timerStart:(loc&&loc.timerStart)||null}); });
-    if(d.tsec!==undefined) S.tsec=d.tsec;
-    _privTs=d.ts||Date.now();
-    savePrivateData();
-    renderAll();
+    var _sigB=_privSig();
+    try{ var _prev=localStorage.getItem(privateDataKey(PRIVATE_UID)); if(_prev) localStorage.setItem(privateDataKey(PRIVATE_UID)+'_bak', _prev); }catch(e){}
+    S.projects=_privMerge(S.projects,d.projects,false);
+    if(Array.isArray(d.templates)) S.templates=_privMerge(S.templates,d.templates,false);
+    S.tasks=_privMerge(S.tasks,d.tasks,true);
+    if(d.tsec!==undefined) S.tsec=Math.max(S.tsec||0,d.tsec);
+    _privTs=Math.max(_privTs||0,d.ts||0);
+    _privReshadow();
+    var _sigA=_privSig();
+    if(_sigA!==_sigB || !silent){ savePrivateData(); renderAll(); }
     if(!silent) toast('✓ Données privées à jour','s');
   }catch(e){}
 }
 async function privateSyncOnEnter(){
   var url=privateSurlGet(); if(!url) return;
-  try{
-    var r=await fetch(url+'?action=timestamp',{cache:'no-store'}); if(!r.ok) return;
-    var d=await r.json(); var sheetTs=(d&&d.ts)||0;
-    if(sheetTs>_privTs) await privateImport(true);
-    else if(_privTs>sheetTs) await privateExport(true);
-  }catch(e){}
+  await privateImport(true);
+  if((((S.tasks&&S.tasks.length)||0)+((S.projects&&S.projects.length)||0))>0) await privateExport(true);
 }
 async function _privPollCheck(){
-  var url=privateSurlGet(); if(!url||!PRIVATE_MODE) return;
-  try{
-    var r=await fetch(url+'?action=timestamp',{cache:'no-store'}); if(!r.ok) return;
-    var d=await r.json(); var sheetTs=(d&&d.ts)||0;
-    if(sheetTs>_privTs) await privateImport(true);
-  }catch(e){}
+  if(!PRIVATE_MODE) return;
+  await privateImport(true);
 }
 function startPrivatePoll(){ if(_privPoll) return; _privPoll=setInterval(_privPollCheck, 8000); }
 function stopPrivatePoll(){ if(_privPoll){ clearInterval(_privPoll); _privPoll=null; } }
@@ -1516,7 +1539,7 @@ async function privatePull(){
   await privateImport(false); privateSyncStatus();
 }
 function save(){
-  if(PRIVATE_MODE){ _privTs=Date.now(); savePrivateData(); schedulePrivateExport(); return; }
+  if(PRIVATE_MODE){ _privBumpUpd(); _privTs=Date.now(); savePrivateData(); schedulePrivateExport(); return; }
   localStorage.setItem('gh_erp',JSON.stringify({
     users:S.users,tasks:S.tasks,projects:S.projects,
     templates:S.templates,
@@ -2948,8 +2971,8 @@ function renderArchive(){
 
   }else{
     // ── Corbeille ──
-    const dtasks=S.tasks.filter(t=>t.deleted);
-    const dprojs=S.projects.filter(p=>p.deleted);
+    const dtasks=S.tasks.filter(t=>t.deleted&&!t._tomb);
+    const dprojs=S.projects.filter(p=>p.deleted&&!p._tomb);
     if(!dtasks.length&&!dprojs.length){
       el.innerHTML='<div class="empty"><div class="ei">🗑</div><h3>Corbeille vide</h3><p>Rien n\'a été supprimé définitivement.</p></div>';
       return;
@@ -3000,9 +3023,9 @@ function renderArchive(){
   }
 }
 function restoreProject(id){const p=S.projects.find(x=>x.id===id);if(p){p.archived=false;p.deleted=false;S.tasks.forEach(t=>{if(t._archWith===id){t.archived=false;t._archWith=null;}});save();renderAll();toast('↩ Projet et ses tâches restaurés','s');syncNow();}}
-function hardDeleteProject(id){if(!confirm('Supprimer définitivement ce projet ET toutes ses tâches ?\n\nCette action est irréversible.'))return;S.projects=S.projects.filter(p=>p.id!==id);S.tasks=S.tasks.filter(t=>t.project!==id);save();renderArchive();renderSidebar();toast('Projet supprimé définitivement','e');syncNow();}
-function hardDeleteTask(id){if(!confirm('Supprimer définitivement cette tâche ?\n\nCette action est irréversible.'))return;S.tasks=S.tasks.filter(t=>t.id!==id);save();renderArchive();renderSidebar();toast('Tâche supprimée définitivement','e');syncNow();}
-function emptyTrash(){S.tasks=S.tasks.filter(t=>!t.deleted);S.projects=S.projects.filter(p=>!p.deleted);save();renderArchive();renderSidebar();toast('Corbeille vidée','e');syncNow();}
+function hardDeleteProject(id){if(!confirm('Supprimer définitivement ce projet ET toutes ses tâches ?\n\nCette action est irréversible.'))return;if(PRIVATE_MODE){var _p=S.projects.find(x=>x.id===id);if(_p)_privTombItem(_p);S.tasks.forEach(function(t){if(t.project===id)_privTombItem(t);});}else{S.projects=S.projects.filter(p=>p.id!==id);S.tasks=S.tasks.filter(t=>t.project!==id);}save();renderArchive();renderSidebar();toast('Projet supprimé définitivement','e');syncNow();}
+function hardDeleteTask(id){if(!confirm('Supprimer définitivement cette tâche ?\n\nCette action est irréversible.'))return;if(PRIVATE_MODE){var _t=S.tasks.find(x=>x.id===id);if(_t)_privTombItem(_t);}else{S.tasks=S.tasks.filter(t=>t.id!==id);}save();renderArchive();renderSidebar();toast('Tâche supprimée définitivement','e');syncNow();}
+function emptyTrash(){if(PRIVATE_MODE){S.tasks.forEach(function(t){if(t.deleted&&!t._tomb)_privTombItem(t);});S.projects.forEach(function(p){if(p.deleted&&!p._tomb)_privTombItem(p);});}else{S.tasks=S.tasks.filter(t=>!t.deleted);S.projects=S.projects.filter(p=>!p.deleted);}save();renderArchive();renderSidebar();toast('Corbeille vidée','e');syncNow();}
 
 // ── STATS ──
 function recordCompletion(t){
@@ -3965,7 +3988,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.31';
+const APP_VERSION = '5.34';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
