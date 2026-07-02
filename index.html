@@ -1961,7 +1961,7 @@ async function silentImport(){if(PRIVATE_MODE)return;
 
     // Remplacement avec préservation des timers actifs
     if((!d.projects||!d.projects.length) && (!d.tasks||!d.tasks.length)){ return; } // GARDE : cloud vide -> garder local
-    S.projects = d.projects;
+    S.projects = d.projects; _syncedOnce=true;
     if(Array.isArray(d.templates)) S.templates = d.templates;
     S.tasks = d.tasks.map(t=>{
       const loc = S.tasks.find(x=>x.id===t.id);
@@ -2045,7 +2045,7 @@ async function autoImportOnStart(){if(PRIVATE_MODE)return;
     }
 
     // ── Remplacement complet ──
-    S.projects = d.projects || [];
+    S.projects = d.projects || []; if((d.tasks&&d.tasks.length)||(d.projects&&d.projects.length)) _syncedOnce=true;
     S.tasks = (d.tasks || []).map(t => {
       const local = S.tasks.find(x=>x.id===t.id);
       return {
@@ -3900,7 +3900,7 @@ function saveUser(){
     S.users.push({id:'u'+Date.now(),name,initials,role:document.getElementById('mu-role').value,pole:document.getElementById('mu-pole').value,color:selColor,pin,createdAt:Date.now(),_upd:Date.now()});
     toast('✓ Utilisateur créé','s');
   }
-  save();renderAdmin();closeModal('moUser');
+  save();if(!PRIVATE_MODE && typeof syncNow==='function')syncNow();renderAdmin();closeModal('moUser');
 }
 function renderColorPicker(selected){
   document.getElementById('colorPicker').innerHTML=AVATAR_COLORS.map(c=>`<div class="color-dot${c===selected?' sel':''}" data-color="${c}" style="width:26px;height:26px;border-radius:50%;background:${c};cursor:pointer;border:3px solid ${c===selected?'var(--tx)':'transparent'};transition:all .15s;" onclick="selectColor('${c}',this)"></div>`).join('');
@@ -3984,9 +3984,10 @@ async function doSync(){if(PRIVATE_MODE){toast("🔒 Synchro désactivée en esp
   if(dir==='import'||dir==='both')await impSheets(url);
   closeModal('moSync');
 }
+var _syncedOnce=false;
 async function expSheets(url, silent=false){if(PRIVATE_MODE)return;
   if(!url){if(!silent)toast('URL Sheets non configurée','e');return;}
-  if(silent && (((S.tasks&&S.tasks.length)||0)+((S.projects&&S.projects.length)||0))===0){ console.warn('[Sync] Envoi vide bloqué (anti-effacement)'); return; }
+  if(silent && !_syncedOnce && (((S.tasks&&S.tasks.length)||0)+((S.projects&&S.projects.length)||0))===0){ console.warn('[Sync] Envoi vide bloqué (appareil jamais synchronisé)'); return; }
   if(!silent) toast('Sauvegarde vers Sheets...','i');
   try{
     const ts=Date.now();
@@ -4103,7 +4104,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.43';
+const APP_VERSION = '5.44';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
