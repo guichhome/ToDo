@@ -1424,7 +1424,7 @@ async function privateFetchAccount(){
     var d=await r.json(); if(!d||!d.success) return null;
     if(Array.isArray(d.users) && d.users.length){
       var acc=d.users.find(function(u){return u && u.private;}) || d.users[0];
-      if(acc && acc.pin) return acc;
+      if(acc){ if(!acc.pin && acc.pcode) acc.pin=acc.pcode; if(acc.pin) return acc; }
     }
   }catch(e){}
   return null;
@@ -1519,7 +1519,7 @@ async function privateExport(silent){
   if(silent && (((S.tasks&&S.tasks.length)||0)+((S.projects&&S.projects.length)||0))===0) return;
   var url=privateSurlGet(); if(!url){ if(!silent) toast('Lien de synchro privé non configuré','w'); return; }
   try{
-    var u=CU?Object.assign({},CU):null;
+    var u=CU?Object.assign({},CU):null; if(u){ u.pcode=u.pin; }
     var payload=JSON.stringify({action:'sync',projects:S.projects,tasks:S.tasks,templates:S.templates,users:u?[u]:[],tsec:S.tsec,ts:_privTs||Date.now()});
     await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:payload});
     if(!silent) toast('✓ Espace privé synchronisé','s');
@@ -1992,11 +1992,14 @@ function mergeUsersFromSheet(arr){
     if(!su||!su.id) return;
     const lu=S.users.find(x=>x.id===su.id);
     if(lu){
-      if(su.name!==undefined) lu.name=su.name;
-      if(su.initials!==undefined) lu.initials=su.initials;
-      if(su.role!==undefined) lu.role=su.role;
-      if(su.pole!==undefined) lu.pole=su.pole;
-      if(su.color!==undefined) lu.color=su.color;
+      if((su._upd||0) > (lu._upd||0)){
+        if(su.name!==undefined) lu.name=su.name;
+        if(su.initials!==undefined) lu.initials=su.initials;
+        if(su.role!==undefined) lu.role=su.role;
+        if(su.pole!==undefined) lu.pole=su.pole;
+        if(su.color!==undefined) lu.color=su.color;
+        lu._upd=su._upd||0;
+      }
     } else {
       const nu=Object.assign({}, su); if(!nu.pin) nu.pin=''; S.users.push(nu);
     }
@@ -3888,11 +3891,11 @@ function saveUser(){
   const initials=document.getElementById('mu-init').value.trim().toUpperCase().slice(0,2)||name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   if(editId){
     const u=S.users.find(x=>x.id===editId);
-    if(u){Object.assign(u,{name,initials,role:document.getElementById('mu-role').value,pole:document.getElementById('mu-pole').value,color:selColor});if(pin)u.pin=pin;}
+    if(u){Object.assign(u,{name,initials,role:document.getElementById('mu-role').value,pole:document.getElementById('mu-pole').value,color:selColor});if(pin)u.pin=pin;u._upd=Date.now();}
     toast('✓ Utilisateur mis à jour','s');
   }else{
     if(!pin){toast('Entrez un PIN','e');return;}
-    S.users.push({id:'u'+Date.now(),name,initials,role:document.getElementById('mu-role').value,pole:document.getElementById('mu-pole').value,color:selColor,pin,createdAt:Date.now()});
+    S.users.push({id:'u'+Date.now(),name,initials,role:document.getElementById('mu-role').value,pole:document.getElementById('mu-pole').value,color:selColor,pin,createdAt:Date.now(),_upd:Date.now()});
     toast('✓ Utilisateur créé','s');
   }
   save();renderAdmin();closeModal('moUser');
@@ -4098,7 +4101,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.40';
+const APP_VERSION = '5.42';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
