@@ -904,6 +904,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
       <div class="pin-keypad" id="pinKeypad"></div>
       <div class="pin-error" id="pinError"></div>
     </div>
+    <div id="appVerLabel" style="text-align:center;margin-top:22px;font-size:11px;color:var(--tx3);opacity:0.55;font-family:'D-DIN',monospace;"></div>
   </div>
 </div>
 
@@ -1786,6 +1787,7 @@ function renderLogin(){
   const grid=document.getElementById('userGrid');
   console.log('[Login] S.users:', S.users.length, 'grid:', !!grid);
   if(!grid){ console.error('[Login] userGrid introuvable!'); return; }
+  try{var _vl=document.getElementById('appVerLabel'); if(_vl)_vl.textContent='v'+APP_VERSION;}catch(_){}
   grid.innerHTML=S.users.filter(u=>u.role!=='disabled').map(u=>`
     <div class="user-card" onclick="selectUser('${u.id}')" id="uc-${u.id}">
       <div class="uc-avatar" style="background:${u.color}">${u.initials}</div>
@@ -4101,7 +4103,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.42';
+const APP_VERSION = '5.43';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
