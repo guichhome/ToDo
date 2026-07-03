@@ -877,6 +877,15 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .cli-side{flex-shrink:0;}
 .cli-badge{font-size:11px;background:var(--brand-xs);color:var(--brand);padding:4px 9px;border-radius:12px;white-space:nowrap;font-family:'D-DIN',monospace;}
 .tlc-cli{font-size:11px;color:#4e8a4e;background:rgba(95,168,95,0.14);padding:2px 8px;border-radius:10px;white-space:nowrap;}
+
+/* ── NETTOYAGE (retours utilisateur) ── */
+/* Point 1 : boutons dossiers/projets toujours visibles (mobile) */
+.pc-acts,.fc-acts{opacity:1 !important;}
+/* Points 7-8 : retirer pôle projet, pôle tâche & estimation partout */
+.fg:has(#mp-pole),.fg:has(#polePicker),.fg:has(#mt-est){display:none!important;}
+/* Point 6 : retirer le client dans l'espace perso */
+.private-mode .fg:has(#mp-client){display:none!important;}
+.private-mode .tlc-cli{display:none!important;}
 </style>
 </head>
 <body>
@@ -1421,7 +1430,7 @@ function enterPrivateMode(uid){
   _privReshadow();
   CU=pu;
   initApp();
-  var _app=document.getElementById('app'); if(_app) _app.classList.add('private-mode');
+  var _app=document.getElementById('app'); if(_app) _app.classList.add('private-mode'); document.body.classList.add('private-mode');
   goPage('dashboard');
   togglePrivateBadge(true);
   setAppBrand('Tâches');
@@ -1436,7 +1445,7 @@ function exitPrivateMode(){
   PRIVATE_MODE=false; PRIVATE_UID=null;
   CU=null; pinBuffer=''; selectedLoginUser=null;
   togglePrivateBadge(false);
-  var _app=document.getElementById('app'); if(_app) _app.classList.remove('private-mode');
+  var _app=document.getElementById('app'); if(_app) _app.classList.remove('private-mode'); document.body.classList.remove('private-mode');
   load();
   showScreen('login'); renderLogin();
 }
@@ -3105,53 +3114,30 @@ function renderArchive(){
 
   }else{
     // ── Corbeille ──
-    const dtasks=S.tasks.filter(t=>t.deleted&&!t._tomb);
-    const dprojs=S.projects.filter(p=>p.deleted&&!p._tomb);
+    const dtasks=S.tasks.filter(function(t){return t.deleted&&!t._tomb;});
+    const dprojs=S.projects.filter(function(p){return p.deleted&&!p._tomb;});
     if(!dtasks.length&&!dprojs.length){
-      el.innerHTML='<div class="empty"><div class="ei">🗑</div><h3>Corbeille vide</h3><p>Rien n\'a été supprimé définitivement.</p></div>';
+      el.innerHTML='<div class="empty"><div class="ei">🗑</div><h3>Corbeille vide</h3><p>Rien n\'a été supprimé.</p></div>';
       return;
     }
-    let html='<div style="margin-bottom:10px;display:flex;justify-content:flex-end;">'+
-      '<button class="btn danger sm" onclick="emptyTrash()">🗑 Vider la corbeille</button></div>';
-
-    // Projets supprimés par pôle
+    let html='<div style="margin-bottom:10px;display:flex;justify-content:flex-end;"><button class="btn danger sm" onclick="emptyTrash()">🗑 Vider la corbeille</button></div>';
     if(dprojs.length){
-      html+='<div class="gg"><div class="ggh">Projets supprimés<div class="bar"></div></div>';
-      POLES.forEach(pole=>{
-        const pp=dprojs.filter(p=>p.pole===pole.id);
-        if(!pp.length)return;
-        html+='<div style="margin-left:8px;margin-bottom:6px;">'+
-          '<div style="font-size:11px;color:var(--tx3);margin-bottom:4px;">'+pole.ico+' '+pole.label+'</div>'+
-          '<div class="tl">'+pp.map(p=>
-            '<div class="tc"><div class="tck"></div>'+
-            '<div class="tb"><div class="tn">'+p.name+'</div><div class="tm"><span class="badge done-b">SUPPRIMÉ</span></div></div>'+
-            '<div style="display:flex;gap:4px;flex-shrink:0;align-self:center;">'+
-              '<button class="tbt" onclick="restoreProject(\''+p.id+'\')" style="color:var(--ok)">↩</button>'+
-              '<button class="tbt del" onclick="hardDeleteProject(\''+p.id+'\')">×</button>'+
-            '</div></div>'
-          ).join('')+'</div></div>';
-      });
-      html+='</div>';
+      html+='<div class="gg"><div class="ggh">Projets & dossiers supprimés ('+dprojs.length+')<div class="bar"></div></div><div class="tl">'+
+        dprojs.map(function(p){return '<div class="tc"><div class="tck"></div>'+
+          '<div class="tb"><div class="tn">'+esc(p.name)+(p.isFolder?' <span style="opacity:.6;font-size:11px;">(dossier)</span>':'')+'</div><div class="tm"><span class="badge done-b">SUPPRIMÉ</span></div></div>'+
+          '<div style="display:flex;gap:4px;flex-shrink:0;align-self:center;">'+
+            '<button class="tbt" onclick="restoreProject(\''+p.id+'\')" style="color:var(--ok)" title="Restaurer">↩</button>'+
+            '<button class="tbt del" onclick="hardDeleteProject(\''+p.id+'\')" title="Supprimer définitivement">×</button>'+
+          '</div></div>';}).join('')+'</div></div>';
     }
-
-    // Tâches supprimées par pôle
     if(dtasks.length){
-      html+='<div class="gg"><div class="ggh">Tâches supprimées<div class="bar"></div></div>';
-      POLES.forEach(pole=>{
-        const pt=dtasks.filter(t=>t.pole===pole.id);
-        if(!pt.length)return;
-        html+='<div style="margin-left:8px;margin-bottom:6px;">'+
-          '<div style="font-size:11px;color:var(--tx3);margin-bottom:4px;">'+pole.ico+' '+pole.label+'</div>'+
-          '<div class="tl">'+pt.map(t=>
-            '<div class="tc"><div class="tck"></div>'+
-            '<div class="tb"><div class="tn">'+t.name+'</div><div class="tm"><span class="badge done-b">SUPPRIMÉ</span></div></div>'+
-            '<div style="display:flex;gap:4px;flex-shrink:0;align-self:center;">'+
-              '<button class="tbt" onclick="restoreTask(\''+t.id+'\')" style="color:var(--ok)">↩</button>'+
-              '<button class="tbt del" onclick="hardDeleteTask(\''+t.id+'\')">×</button>'+
-            '</div></div>'
-          ).join('')+'</div></div>';
-      });
-      html+='</div>';
+      html+='<div class="gg"><div class="ggh">Tâches supprimées ('+dtasks.length+')<div class="bar"></div></div><div class="tl">'+
+        dtasks.map(function(t){return '<div class="tc"><div class="tck"></div>'+
+          '<div class="tb"><div class="tn">'+esc(t.name)+'</div><div class="tm"><span class="badge done-b">SUPPRIMÉ</span></div></div>'+
+          '<div style="display:flex;gap:4px;flex-shrink:0;align-self:center;">'+
+            '<button class="tbt" onclick="restoreTask(\''+t.id+'\')" style="color:var(--ok)" title="Restaurer">↩</button>'+
+            '<button class="tbt del" onclick="hardDeleteTask(\''+t.id+'\')" title="Supprimer définitivement">×</button>'+
+          '</div></div>';}).join('')+'</div></div>';
     }
     el.innerHTML=html;
   }
@@ -3362,7 +3348,7 @@ function renderStats(){
 
   var _statsFull=!!(document.getElementById('app')&&document.getElementById('app').classList.contains('stats-mode'));
   if(_statsFull){
-    grid.innerHTML=kpiBlock+trendBlock+projBlock+persBlock+poleBlock+cliBlock+yieldBlock+
+    grid.innerHTML=kpiBlock+trendBlock+persBlock+cliBlock+yieldBlock+
     '<div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="stats-two">'+overdueBlock+recentBlock+'</div>';
   } else {
     grid.innerHTML=projBlock;
@@ -4349,7 +4335,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.48';
+const APP_VERSION = '5.51';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
