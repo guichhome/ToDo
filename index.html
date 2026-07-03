@@ -863,6 +863,19 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .private-mode #polesSection{display:none!important;}
 .private-mode #nav-stats{display:none!important;}
 .private-mode .fg:has(#polePicker),.private-mode .fg:has(#mt-est){display:none!important;}
+
+/* ── WIDGET CLIENTS ── */
+.clients-mode #mainSection,.clients-mode #polesSection,.clients-mode #adminSection,.clients-mode .sbdiv{display:none!important;}
+.clients-mode .h-right .btn.pri.sm{display:none!important;}
+.cli-card{display:flex;align-items:center;gap:12px;background:var(--sf2);border:1px solid var(--bd);border-radius:var(--r);padding:11px 13px;margin-bottom:8px;cursor:pointer;transition:var(--tr);}
+.cli-card:hover{border-color:var(--brand);box-shadow:var(--sh);}
+.cli-av{width:42px;height:42px;border-radius:50%;background:#5fa85f;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0;}
+.cli-body{flex:1;min-width:0;}
+.cli-name{font-size:14px;font-weight:600;color:var(--tx);}
+.cli-meta{font-size:12px;color:var(--tx3);margin-top:2px;}
+.cli-addr{font-size:11px;color:var(--tx4);margin-top:3px;}
+.cli-side{flex-shrink:0;}
+.cli-badge{font-size:11px;background:var(--brand-xs);color:var(--brand);padding:4px 9px;border-radius:12px;white-space:nowrap;font-family:'D-DIN',monospace;}
 </style>
 </head>
 <body>
@@ -1081,6 +1094,13 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   <div class="page" id="pg-stats">
     <div class="pgh"><div><div class="pgt">Statistiques</div><div class="pgs">Analyse complète de l'activité</div></div><div class="pga"><button class="btn sm" onclick="exportCSV()">⬇ Export CSV</button></div></div>
     <div class="stats-grid" id="statsGrid"></div>
+  </div>
+
+  <!-- ── CLIENTS ── -->
+  <div class="page" id="pg-clients">
+    <div class="pgh"><div><div class="pgt">Clients</div><div class="pgs"><span id="cli-count">0</span> client(s) &middot; carnet d'adresses</div></div><div class="pga"><button class="btn pri sm" onclick="openNewClient()">+ Client</button></div></div>
+    <input type="text" class="fi" id="cli-search" placeholder="Rechercher (nom, telephone, email...)" oninput="renderClients()" style="margin-bottom:12px;"/>
+    <div id="clientsList"></div>
   </div>
 
   <!-- ── ARCHIVES ── -->
@@ -1603,7 +1623,7 @@ function save(){
     templates:S.templates,
     notifications:S.notifications,
     tsec:S.tsec,surl:S.surl,theme:S.theme,
-    sidebarOpen:S.sidebarOpen,history:S.history,
+    sidebarOpen:S.sidebarOpen,history:S.history,clients:S.clients||[],
   }));
   if(S.surl){
     _savePending = true; // Bloque checkTimestamp pendant l'export
@@ -1643,6 +1663,7 @@ function load(){
       tsec:d.tsec||0,surl:d.surl||DEFAULT_SURL||'',theme:d.theme||'dark',
       sidebarOpen:d.sidebarOpen!==undefined?d.sidebarOpen:true,
       history:Array.isArray(d.history)?d.history:[],
+      clients:Array.isArray(d.clients)?d.clients:[],
     });
     S.curFolder=null;
     S.tasks.forEach(t=>t.timerRunning=false);
@@ -1973,14 +1994,14 @@ async function silentImport(){if(PRIVATE_MODE)return;
       };
     });
     if(d.tsec!==undefined) S.tsec=d.tsec;
-    mergeUsersFromSheet(d.users);
+    mergeUsersFromSheet(d.users); if(Array.isArray(d.clients)) mergeClientsFromSheet(d.clients);
     // Sauvegarde locale sans re-déclencher l'export
     localStorage.setItem('gh_erp',JSON.stringify({
       users:S.users,tasks:S.tasks,projects:S.projects,
       templates:S.templates,
       notifications:S.notifications,
       tsec:S.tsec,surl:S.surl,theme:S.theme,
-      sidebarOpen:S.sidebarOpen,history:S.history,
+      sidebarOpen:S.sidebarOpen,history:S.history,clients:S.clients||[],
     }));
     renderAll();
     console.log('[Sync] OK:',d.projects.length,'projets,',d.tasks.filter(t=>!t.deleted&&!t.archived&&!t.done).length,'actives');
@@ -2057,7 +2078,7 @@ async function autoImportOnStart(){if(PRIVATE_MODE)return;
       };
     });
     if(d.tsec !== undefined) S.tsec = d.tsec;
-    mergeUsersFromSheet(d.users);
+    mergeUsersFromSheet(d.users); if(Array.isArray(d.clients)) mergeClientsFromSheet(d.clients);
 
     save();
     renderAll();
@@ -2094,7 +2115,7 @@ function goPage(p){
   const navEl=document.getElementById('nav-'+p)||document.getElementById('nav-'+p.split('-')[0]+'-'+p.split('-')[1]);
   if(navEl)navEl.classList.add('act');
   // Breadcrumb
-  const labels={dashboard:'Dashboard',kanban:'Kanban',projects:'Projets',all:'Toutes les tâches','my-tasks':'Mes tâches',urgent:'Urgentes',done:'Tâches terminées',stats:'Statistiques',archive:'Archives',admin:'Administration',
+  const labels={dashboard:'Dashboard',kanban:'Kanban',projects:'Projets',all:'Toutes les tâches','my-tasks':'Mes tâches',urgent:'Urgentes',done:'Tâches terminées',stats:'Statistiques',archive:'Archives',admin:'Administration',clients:'Clients',
     'pole-arch':'Architecture','pole-compta':'Comptabilité','pole-marketing':'Marketing','pole-gestion':'Gestion','pole-atelier':'Atelier','pole-commercial':'Commercial'};
   document.getElementById('bc').innerHTML=`<span class="cur">${labels[p]||p}</span>`;
   // Sur mobile, refermer le tiroir après navigation
@@ -2112,6 +2133,7 @@ function renderPage(p){
   else if(p==='done')renderDonePage();
   else if(p==='stats')renderStats();
   else if(p==='archive')renderArchive();
+  else if(p==='clients')renderClients();
   else if(p==='admin')renderAdmin();
   else if(p.startsWith('pole-'))renderPole(S.curPole);
 }
@@ -3892,6 +3914,115 @@ function deleteProjTemplate(id){
   toast('Modèle supprimé','i');
 }
 
+function mergeClientsFromSheet(arr){
+  if(!Array.isArray(arr)) return;
+  if(!S.clients) S.clients=[];
+  arr.forEach(function(sc){
+    if(!sc||!sc.id) return;
+    var lc=S.clients.find(function(x){return x.id===sc.id;});
+    if(lc){
+      if((sc._upd||0) > (lc._upd||0)){
+        lc.name=sc.name; lc.phone=sc.phone; lc.email=sc.email; lc.address=sc.address; lc.notes=sc.notes; lc._upd=sc._upd||0; lc._deleted=sc._deleted||false;
+      }
+    } else { S.clients.push(sc); }
+  });
+}
+function clientProjectCount(c){
+  return (S.projects||[]).filter(function(p){return !p.deleted && !p.isFolder && (p.clientId===c.id || (!p.clientId && p.client && p.client===c.name));}).length;
+}
+function renderClients(){
+  var list=document.getElementById('clientsList'); if(!list) return;
+  var all=(S.clients||[]).filter(function(c){return !c._deleted;});
+  var cEl=document.getElementById('cli-count'); if(cEl) cEl.textContent=all.length;
+  var q=(document.getElementById('cli-search')?document.getElementById('cli-search').value:'').toLowerCase().trim();
+  var cls=all.filter(function(c){ return !q || (c.name||'').toLowerCase().includes(q) || (c.phone||'').toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q) || (c.address||'').toLowerCase().includes(q); }).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+  if(!cls.length){ list.innerHTML='<div style="text-align:center;color:var(--tx4);padding:34px 12px;font-size:13px;">'+(q?'Aucun client trouvé.':'Aucun client pour l\'instant.<br>Clique « + Client » pour créer ton carnet d\'adresses.')+'</div>'; return; }
+  list.innerHTML=cls.map(function(c){
+    var np=clientProjectCount(c);
+    var ini=(c.name||'?').trim().slice(0,2).toUpperCase();
+    var contact=[];
+    if(c.phone) contact.push('📞 '+esc(c.phone));
+    if(c.email) contact.push('✉ '+esc(c.email));
+    return '<div class="cli-card" onclick="editClient(\''+c.id+'\')">'+
+      '<div class="cli-av">'+esc(ini)+'</div>'+
+      '<div class="cli-body">'+
+        '<div class="cli-name">'+esc(c.name)+'</div>'+
+        '<div class="cli-meta">'+(contact.length?contact.join('  ·  '):'<span style="color:var(--tx4)">Pas de contact</span>')+'</div>'+
+        (c.address?'<div class="cli-addr">📍 '+esc(c.address)+'</div>':'')+
+      '</div>'+
+      '<div class="cli-side"><span class="cli-badge">'+np+' projet'+(np>1?'s':'')+'</span></div>'+
+    '</div>';
+  }).join('');
+}
+function ensureClientModal(){
+  if(document.getElementById('moClient')) return;
+  var d=document.createElement('div'); d.className='mo'; d.id='moClient';
+  d.innerHTML='<div class="mbox">'+
+    '<div class="mt" id="cliModalTitle">Nouveau client</div>'+
+    '<input type="hidden" id="editClientId"/>'+
+    '<div class="fg"><label class="fl">Nom / Raison sociale *</label><input type="text" class="fi" id="cli-name" placeholder="Ex : M. et Mme Dupont"/></div>'+
+    '<div class="fr">'+
+      '<div class="fg"><label class="fl">Téléphone</label><input type="text" class="fi" id="cli-phone" placeholder="06 12 34 56 78"/></div>'+
+      '<div class="fg"><label class="fl">Email</label><input type="text" class="fi" id="cli-email" placeholder="client@email.fr"/></div>'+
+    '</div>'+
+    '<div class="fg"><label class="fl">Adresse</label><input type="text" class="fi" id="cli-address" placeholder="12 rue des Chênes, 35000 Rennes"/></div>'+
+    '<div class="fg"><label class="fl">Notes</label><textarea class="fi" id="cli-notes" rows="2" placeholder="Infos utiles, préférences, historique..."></textarea></div>'+
+    '<div class="ma">'+
+      '<button class="btn" id="cliDelBtn" onclick="deleteClient()" style="color:#E05528;margin-right:auto;">🗑 Supprimer</button>'+
+      '<button class="btn" onclick="closeModal(\'moClient\')">Annuler</button>'+
+      '<button class="btn pri" onclick="saveClient()">Enregistrer</button>'+
+    '</div>'+
+  '</div>';
+  document.body.appendChild(d);
+}
+function openNewClient(){
+  ensureClientModal();
+  document.getElementById('editClientId').value='';
+  ['cli-name','cli-phone','cli-email','cli-address','cli-notes'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+  document.getElementById('cliModalTitle').textContent='Nouveau client';
+  document.getElementById('cliDelBtn').style.display='none';
+  openModal('moClient');
+  setTimeout(function(){var e=document.getElementById('cli-name');if(e)e.focus();},100);
+}
+function editClient(id){
+  ensureClientModal();
+  var c=(S.clients||[]).find(function(x){return x.id===id;}); if(!c) return;
+  document.getElementById('editClientId').value=id;
+  document.getElementById('cli-name').value=c.name||'';
+  document.getElementById('cli-phone').value=c.phone||'';
+  document.getElementById('cli-email').value=c.email||'';
+  document.getElementById('cli-address').value=c.address||'';
+  document.getElementById('cli-notes').value=c.notes||'';
+  document.getElementById('cliModalTitle').textContent='Modifier le client';
+  document.getElementById('cliDelBtn').style.display='';
+  openModal('moClient');
+}
+function saveClient(){
+  var name=document.getElementById('cli-name').value.trim();
+  if(!name){ toast('Entrez un nom','e'); return; }
+  var id=document.getElementById('editClientId').value;
+  var data={name:name, phone:document.getElementById('cli-phone').value.trim(), email:document.getElementById('cli-email').value.trim(), address:document.getElementById('cli-address').value.trim(), notes:document.getElementById('cli-notes').value.trim(), _upd:Date.now(), _deleted:false};
+  if(!S.clients) S.clients=[];
+  if(id){
+    var c=S.clients.find(function(x){return x.id===id;});
+    if(c){ var oldName=c.name; Object.assign(c,data); if(oldName!==name){ (S.projects||[]).forEach(function(p){ if(p.clientId===id) p.client=name; }); } }
+    toast('✓ Client mis à jour','s');
+  } else {
+    S.clients.push(Object.assign({id:'cli'+Date.now(), createdAt:Date.now()}, data));
+    toast('✓ Client ajouté','s');
+  }
+  save(); if(!PRIVATE_MODE && typeof syncNow==='function') syncNow();
+  closeModal('moClient'); renderClients();
+}
+function deleteClient(){
+  var id=document.getElementById('editClientId').value; if(!id) return;
+  var c=(S.clients||[]).find(function(x){return x.id===id;}); if(!c) return;
+  if(!confirm('Supprimer le client « '+(c.name||'')+' » ? Les projets liés ne sont pas supprimés.')) return;
+  c._deleted=true; c._upd=Date.now();
+  save(); if(!PRIVATE_MODE && typeof syncNow==='function') syncNow();
+  closeModal('moClient'); renderClients(); toast('Client supprimé','i');
+}
+
 function saveProject(){
   const name=document.getElementById('mp-n').value.trim();if(!name){toast('Entrez un nom','e');return;}
   var drive=document.getElementById('mp-drive').value.trim();if(drive&&!/^https?:\/\//i.test(drive))drive='https://'+drive;
@@ -4063,6 +4194,7 @@ async function expSheets(url, silent=false){if(PRIVATE_MODE)return;
       projects:S.projects,
       tasks:S.tasks,
       templates:S.templates,
+      clients:S.clients||[],
       users:S.users.map(u=>{const uu={...u};delete uu.pin;return uu;}),
       tsec:S.tsec,
       ts:ts
@@ -4094,7 +4226,7 @@ async function impSheets(url){
     let np=0,nt=0;
     (d.projects||[]).forEach(p=>{if(!S.projects.find(x=>x.id===p.id)){S.projects.push(p);np++;}});
     (d.tasks||[]).forEach(t=>{if(!S.tasks.find(x=>x.id===t.id)){S.tasks.push(t);nt++;}});
-    mergeUsersFromSheet(d.users);
+    mergeUsersFromSheet(d.users); if(Array.isArray(d.clients)) mergeClientsFromSheet(d.clients);
     save();renderAll();
     toast('✓ '+np+' projet(s) et '+nt+' tâche(s) importés','s');
     addNotif('Sync Sheets','Import réussi: '+np+' projets, '+nt+' tâches','s');
@@ -4171,7 +4303,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.45';
+const APP_VERSION = '5.46';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
@@ -4201,7 +4333,7 @@ const WIDGETS=[
   {id:'tasks',name:'Tâches',desc:'Gestion des tâches, Kanban & suivi du temps',ico:'🗂️',color:'#d4873a',bg:'#faf1e8',active:true},
   {id:'stats',name:'Statistiques',desc:'Rendements, temps & performance',ico:'📈',color:'#7c3aed',bg:'#f1ecfb',active:true},
   {id:'quotes',name:'Devis',desc:'Création et suivi des devis clients',ico:'📄',color:'#3a7bd4',bg:'#e8f0fa',active:false},
-  {id:'clients',name:'Clients',desc:"Carnet d'adresses et historique clients",ico:'👥',color:'#5fa85f',bg:'#ecf7ec',active:false},
+  {id:'clients',name:'Clients',desc:"Carnet d'adresses et historique clients",ico:'👥',color:'#5fa85f',bg:'#ecf7ec',active:true},
   {id:'planning',name:'Planning',desc:'Agenda chantiers & équipe',ico:'📅',color:'#c0504e',bg:'#faecec',active:false},
   {id:'stock',name:'Stock',desc:'Inventaire matériaux & fournitures',ico:'📦',color:'#9b59b6',bg:'#f3ecf7',active:false},
   {id:'billing',name:'Facturation',desc:'Factures & encaissements',ico:'💶',color:'#16a085',bg:'#e8f6f3',active:false},
@@ -4241,7 +4373,7 @@ function openWidget(id){
   var app=document.getElementById('app');
   if(id==='admin'){
     if(!(CU&&CU.role==='admin')){ if(typeof toast==='function')toast('Réservé aux administrateurs','w'); return; }
-    if(app){app.classList.remove('stats-mode');app.classList.add('admin-mode');}
+    if(app){app.classList.remove('stats-mode','clients-mode');app.classList.add('admin-mode');}
     setAppBrand('Administration');
     showScreen('app');
     if(typeof applySidebarState==='function') applySidebarState();
@@ -4249,15 +4381,23 @@ function openWidget(id){
     return;
   }
   if(id==='stats'){
-    if(app){app.classList.remove('admin-mode');app.classList.add('stats-mode');}
+    if(app){app.classList.remove('admin-mode','clients-mode');app.classList.add('stats-mode');}
     setAppBrand('Statistiques');
     showScreen('app');
     if(typeof applySidebarState==='function') applySidebarState();
     goPage('stats');
     return;
   }
+  if(id==='clients'){
+    if(app){app.classList.remove('admin-mode','stats-mode');app.classList.add('clients-mode');}
+    setAppBrand('Clients');
+    showScreen('app');
+    if(typeof applySidebarState==='function') applySidebarState();
+    goPage('clients');
+    return;
+  }
   if(id==='tasks'){
-    if(app)app.classList.remove('admin-mode','stats-mode');
+    if(app)app.classList.remove('admin-mode','stats-mode','clients-mode');
     setAppBrand('Tâches');
     showScreen('app');
     if(typeof applySidebarState==='function') applySidebarState();
