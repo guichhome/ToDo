@@ -1,9 +1,9 @@
-const CACHE = 'guichhome-v3';
+const CACHE = 'guichhome-v4';
+// Chemin de index.html adapté automatiquement au sous-dossier (GitHub Pages)
+const INDEX = new URL('./index.html', self.location).pathname;
 
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(['/index.html']).catch(()=>{}))
-  );
+  e.waitUntil(caches.open(CACHE).then(c => c.add(INDEX).catch(() => {})));
   self.skipWaiting();
 });
 
@@ -17,24 +17,23 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = e.request.url;
-  // Toujours en direct pour Google / Sheets
   if (url.includes('googleapis.com') || url.includes('script.google.com')) return;
 
-  // Document principal : RÉSEAU D'ABORD (dernière version si en ligne), cache en secours (hors-ligne)
-  if (e.request.mode === 'navigate' || url.endsWith('/index.html') || url.endsWith('/')) {
+  // Navigation (ouverture de l'app / PWA) : RÉSEAU D'ABORD, cache en secours
+  if (e.request.mode === 'navigate') {
     e.respondWith(
       fetch(e.request).then(resp => {
         if (resp && resp.status === 200) {
           const clone = resp.clone();
-          caches.open(CACHE).then(c => c.put('/index.html', clone));
+          caches.open(CACHE).then(c => c.put(INDEX, clone));
         }
         return resp;
-      }).catch(() => caches.match('/index.html'))
+      }).catch(() => caches.match(INDEX))
     );
     return;
   }
 
-  // Autres ressources (icônes, manifest…) : cache d'abord
+  // Autres ressources : cache d'abord
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
       if (resp && resp.status === 200 && resp.type === 'basic') {
@@ -42,6 +41,6 @@ self.addEventListener('fetch', e => {
         caches.open(CACHE).then(c => c.put(e.request, clone));
       }
       return resp;
-    }).catch(() => caches.match('/index.html')))
+    }).catch(() => caches.match(INDEX)))
   );
 });
