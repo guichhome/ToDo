@@ -1005,6 +1005,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
       <div><div class="pgt">Projets</div><div class="pgs" id="sub-projects">—</div></div>
       <div class="pga">
         <button class="btn sm" onclick="openNewFolder()">+ Dossier</button>
+        <button class="btn sm" onclick="openProjTemplates()">📋 Modèles</button>
         <button class="btn pri sm" onclick="openNewProject()">+ Projet</button>
       </div>
     </div>
@@ -1017,7 +1018,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     <button class="back-btn" onclick="goPage('projects')">← Retour aux projets</button>
     <div class="pgh">
       <div><div class="pgt" id="det-t"></div><div class="pgs" id="det-s"></div></div>
-      <div class="pga"><button class="btn pri sm" onclick="openNewTask()">+ Tâche</button></div>
+      <div class="pga"><button class="btn sm" onclick="saveProjectAsTemplate(S.curProjId)" title="Enregistrer ce projet comme modèle réutilisable">📋 Modèle</button><button class="btn pri sm" onclick="openNewTask()">+ Tâche</button></div>
     </div>
     <div class="prog"><div class="pgr"><span class="pgl">Avancement</span><span class="pgp" id="det-pct">0%</span></div><div class="pb2"><div class="pb2f" id="det-bar"></div></div></div>
     <div class="tfs" id="det-fs">
@@ -3455,8 +3456,8 @@ function testSyncAdmin(){
 }
 
 // ── MODALS ──
-function openModal(id){document.getElementById(id).classList.add('open');}
-function closeModal(id){document.getElementById(id).classList.remove('open');}
+function openModal(id){var e=document.getElementById(id);if(e)e.classList.add('open');}
+function closeModal(id){var e=document.getElementById(id);if(e)e.classList.remove('open');}
 function cancelTask(){closeModal('moTask');}
 function openConfirm(title,msg,action){
   document.getElementById('confirmTitle').textContent=title;
@@ -3628,7 +3629,7 @@ function unitLabel(u){const x=UNITS.find(z=>z.id===u);return x?x.label:'';}
 function renderTemplates(){
   const list=document.getElementById('tplList');
   if(!list)return;
-  const tpls=(S.templates||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const tpls=(S.templates||[]).filter(t=>t.kind!=='project').slice().sort((a,b)=>a.name.localeCompare(b.name));
   if(!tpls.length){
     list.innerHTML='<div style="text-align:center;color:var(--tx4);padding:24px;font-size:13px;">Aucun mod\u00e8le. Cr\u00e9ez-en un ci-dessus pour gagner du temps sur vos t\u00e2ches r\u00e9p\u00e9titives.</div>';
     return;
@@ -3825,6 +3826,72 @@ function saveTask(){
   syncNow(); // Export immédiat
 }
 function openDrive(id){ var p=S.projects.find(function(x){return x.id===id;}); if(p&&p.driveUrl) window.open(p.driveUrl,'_blank','noopener'); }
+function ensureProjTplModal(){
+  if(document.getElementById('moProjTpl')) return;
+  var d=document.createElement('div'); d.className='mo'; d.id='moProjTpl';
+  d.innerHTML='<div class="mbox">'+
+    '<div class="mt">📋 Modèles de projet</div>'+
+    '<div style="font-size:12px;color:var(--tx3);margin:-4px 0 12px;line-height:1.45;">Recrée un projet pré-rempli avec toutes ses tâches en un clic. Pour créer un modèle : ouvre un projet, puis clique « 📋 Modèle » en haut.</div>'+
+    '<div id="projTplList"></div>'+
+    '<div class="ma"><button class="btn" onclick="closeModal(\'moProjTpl\')">Fermer</button></div>'+
+  '</div>';
+  document.body.appendChild(d);
+}
+function openProjTemplates(){ ensureProjTplModal(); renderProjTemplates(); openModal('moProjTpl'); }
+function renderProjTemplates(){
+  var list=document.getElementById('projTplList'); if(!list) return;
+  var tpls=(S.templates||[]).filter(function(t){return t.kind==='project';}).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+  if(!tpls.length){ list.innerHTML='<div style="text-align:center;color:var(--tx4);padding:22px 8px;font-size:13px;">Aucun modèle de projet pour l\'instant.<br>Ouvre un projet et clique « 📋 Modèle » pour en créer un.</div>'; return; }
+  list.innerHTML=tpls.map(function(t){
+    var nt=(t.tasks||[]).length;
+    var pole=(typeof POLES!=='undefined')?POLES.find(function(p){return p.id===t.pole;}):null;
+    return '<div class="tpl-row">'+
+      '<div class="tpl-info">'+
+        '<div class="tpl-name">'+esc(t.name)+'</div>'+
+        '<div class="tpl-meta">'+nt+' tâche'+(nt>1?'s':'')+(pole?' · '+esc(pole.name):'')+'</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:6px;align-items:center;">'+
+        '<button class="btn pri sm" onclick="createProjectFromTemplate(\''+t.id+'\')">Créer un projet</button>'+
+        '<button class="btn sm" onclick="deleteProjTemplate(\''+t.id+'\')" title="Supprimer le modèle">🗑</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+function saveProjectAsTemplate(projectId){
+  var p=S.projects.find(function(x){return x.id===projectId;}); if(!p){ toast('Projet introuvable','e'); return; }
+  var tasks=(S.tasks||[]).filter(function(t){return t.project===projectId && !t.deleted && !t.archived;})
+    .map(function(t){return {name:t.name, pole:t.pole||'', priority:t.priority||'normal', estimate:t.estimate||0, quantity:t.quantity||0, unit:t.unit||null};});
+  if(!tasks.length){ if(!confirm('Ce projet n\'a aucune tâche active. Créer quand même un modèle vide ?')) return; }
+  var nm=prompt('Nom du modèle de projet :', p.name); if(nm===null) return;
+  nm=(nm||'').trim(); if(!nm){ toast('Nom vide','e'); return; }
+  if(!S.templates) S.templates=[];
+  S.templates.push({id:'ptpl'+Date.now(), kind:'project', name:nm, pole:p.pole||'', notes:p.notes||'', tasks:tasks, createdAt:Date.now(), _upd:Date.now()});
+  save(); if(!PRIVATE_MODE && typeof syncNow==='function') syncNow();
+  toast('✓ Modèle « '+nm+' » créé ('+tasks.length+' tâche'+(tasks.length>1?'s':'')+')','s');
+}
+function createProjectFromTemplate(tplId){
+  var t=(S.templates||[]).find(function(x){return x.id===tplId;}); if(!t){ toast('Modèle introuvable','e'); return; }
+  var nm=prompt('Nom du nouveau projet :', t.name); if(nm===null) return;
+  nm=(nm||'').trim(); if(!nm){ toast('Nom vide','e'); return; }
+  var pid='p'+Date.now();
+  S.projects.push({id:pid, name:nm, client:'', pole:t.pole||'', dateStart:'', dateEnd:'', notes:t.notes||'', driveUrl:'', isFolder:false, parentId:S.curFolder||null, archived:false, deleted:false, createdAt:Date.now(), _upd:Date.now()});
+  var now=Date.now();
+  (t.tasks||[]).forEach(function(tt,i){
+    S.tasks.push({id:'t'+(now+i)+Math.floor(Math.random()*1000), name:tt.name, project:pid, pole:tt.pole||'', priority:tt.priority||'normal', assignees:[], estimate:tt.estimate||0, quantity:tt.quantity||0, unit:tt.unit||null, status:'todo', done:false, archived:false, deleted:false, elapsed:0, timerRunning:false, createdAt:now, createdBy:CU?CU.id:'', _upd:now});
+  });
+  save(); if(!PRIVATE_MODE && typeof syncNow==='function') syncNow();
+  closeModal('moProjTpl');
+  toast('✓ Projet « '+nm+' » créé avec '+(t.tasks||[]).length+' tâche'+((t.tasks||[]).length>1?'s':''),'s');
+  openProject(pid);
+}
+function deleteProjTemplate(id){
+  if(!confirm('Supprimer ce modèle de projet ? (les projets déjà créés ne sont pas touchés)')) return;
+  S.templates=(S.templates||[]).filter(function(x){return x.id!==id;});
+  save(); if(!PRIVATE_MODE && typeof syncNow==='function') syncNow();
+  renderProjTemplates();
+  toast('Modèle supprimé','i');
+}
+
 function saveProject(){
   const name=document.getElementById('mp-n').value.trim();if(!name){toast('Entrez un nom','e');return;}
   var drive=document.getElementById('mp-drive').value.trim();if(drive&&!/^https?:\/\//i.test(drive))drive='https://'+drive;
@@ -4104,7 +4171,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.44';
+const APP_VERSION = '5.45';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
