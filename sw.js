@@ -1,4 +1,4 @@
-const CACHE = 'guichhome-v4';
+const CACHE = 'guichhome-v5';
 // Chemin de index.html adapté automatiquement au sous-dossier (GitHub Pages)
 const INDEX = new URL('./index.html', self.location).pathname;
 
