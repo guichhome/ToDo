@@ -876,6 +876,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .cli-addr{font-size:11px;color:var(--tx4);margin-top:3px;}
 .cli-side{flex-shrink:0;}
 .cli-badge{font-size:11px;background:var(--brand-xs);color:var(--brand);padding:4px 9px;border-radius:12px;white-space:nowrap;font-family:'D-DIN',monospace;}
+.tlc-cli{font-size:11px;color:#4e8a4e;background:rgba(95,168,95,0.14);padding:2px 8px;border-radius:10px;white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -1177,7 +1178,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     <input type="hidden" id="editProjectId"/>
     <div class="fg"><label class="fl">Nom du chantier *</label><input type="text" class="fi" id="mp-n" placeholder="Ex: Rénovation cuisine Dupont"/></div>
     <div class="fr">
-      <div class="fg"><label class="fl">Client</label><input type="text" class="fi" id="mp-c" placeholder="Ex: M. et Mme Dupont"/></div>
+      <div class="fg"><label class="fl">Client</label><select class="fi" id="mp-client" onchange="onProjClientChange()"></select></div>
       <div class="fg"><label class="fl">Pôle</label><select class="fs" id="mp-pole"><option value="">— Tous —</option></select></div>
     </div>
     <div class="fr">
@@ -2855,7 +2856,8 @@ function tcardLine(t,arch){
     (us.length>3?'<span class="tlc-more">+'+(us.length-3)+'</span>':'');
 
   // Projet (court)
-  const projHtml=p?'<span class="tlc-proj" title="'+esc(p.name)+'">'+esc(p.name.length>16?p.name.slice(0,16)+'…':p.name)+'</span>':'';
+  const _cliNm=(p&&p.client)?p.client:'';
+  const projHtml=p?'<span class="tlc-proj" title="'+esc(p.name)+'">'+esc(p.name.length>16?p.name.slice(0,16)+'…':p.name)+'</span>'+(_cliNm?'<span class="tlc-cli" title="Client : '+esc(_cliNm)+'">\ud83d\udc64 '+esc(_cliNm.length>14?_cliNm.slice(0,14)+'…':_cliNm)+'</span>':''):'';
 
   // Timer compact
   const timeHtml='<span class="tlc-time" id="td-'+t.id+'">'+fmt(t.elapsed)+'</span>';
@@ -4023,20 +4025,63 @@ function deleteClient(){
   closeModal('moClient'); renderClients(); toast('Client supprimé','i');
 }
 
+function findClientIdByName(name){
+  if(!name) return '';
+  var c=(S.clients||[]).find(function(x){return !x._deleted && (x.name||'').toLowerCase()===String(name).toLowerCase();});
+  return c?c.id:'';
+}
+function fillProjClientSelect(selVal, keepName){
+  var sel=document.getElementById('mp-client'); if(!sel) return;
+  var cls=(S.clients||[]).filter(function(c){return !c._deleted;}).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+  var h='<option value="">— Aucun client —</option>';
+  h+=cls.map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+'</option>';}).join('');
+  if(selVal==='__keep__' && keepName){ h+='<option value="__keep__">'+esc(keepName)+' (à lier)</option>'; }
+  h+='<option value="__new__">➕ Créer un nouveau client…</option>';
+  sel.innerHTML=h;
+  sel.value=selVal||'';
+  sel.setAttribute('data-keep', keepName||'');
+}
+function onProjClientChange(){
+  var sel=document.getElementById('mp-client'); if(!sel || sel.value!=='__new__') return;
+  var nm=prompt('Nom du nouveau client :');
+  if(nm===null || !nm.trim()){ sel.value=''; return; }
+  nm=nm.trim();
+  if(!S.clients) S.clients=[];
+  var ex=(S.clients||[]).find(function(x){return !x._deleted && (x.name||'').toLowerCase()===nm.toLowerCase();});
+  var cid;
+  if(ex){ cid=ex.id; }
+  else {
+    cid='cli'+Date.now();
+    S.clients.push({id:cid,name:nm,phone:'',email:'',address:'',notes:'',createdAt:Date.now(),_upd:Date.now(),_deleted:false});
+    save(); if(!PRIVATE_MODE && typeof syncNow==='function') syncNow();
+    if(typeof toast==='function') toast('✓ Client « '+nm+' » créé','s');
+  }
+  fillProjClientSelect(cid);
+}
+function resolveProjClient(){
+  var sel=document.getElementById('mp-client');
+  if(!sel) return {clientId:'', client:''};
+  var v=sel.value;
+  if(v==='' || v==='__new__') return {clientId:'', client:''};
+  if(v==='__keep__') return {clientId:'', client:sel.getAttribute('data-keep')||''};
+  var c=(S.clients||[]).find(function(x){return x.id===v;});
+  return {clientId:v, client:c?c.name:''};
+}
+
 function saveProject(){
   const name=document.getElementById('mp-n').value.trim();if(!name){toast('Entrez un nom','e');return;}
   var drive=document.getElementById('mp-drive').value.trim();if(drive&&!/^https?:\/\//i.test(drive))drive='https://'+drive;
   const _epid=document.getElementById('editProjectId');
   if(_epid&&_epid.value){
     const p=S.projects.find(x=>x.id===_epid.value);
-    if(p){ p.name=name; p.client=document.getElementById('mp-c').value.trim(); p.pole=document.getElementById('mp-pole').value; p.dateStart=document.getElementById('mp-ds').value; p.dateEnd=document.getElementById('mp-de').value; p.notes=document.getElementById('mp-notes').value.trim(); p.driveUrl=drive; }
+    if(p){ p.name=name; var _pcE=resolveProjClient(); p.client=_pcE.client; p.clientId=_pcE.clientId; p.pole=document.getElementById('mp-pole').value; p.dateStart=document.getElementById('mp-ds').value; p.dateEnd=document.getElementById('mp-de').value; p.notes=document.getElementById('mp-notes').value.trim(); p.driveUrl=drive; }
     _epid.value='';
-    ['mp-n','mp-c','mp-ds','mp-de','mp-notes','mp-drive'].forEach(id=>document.getElementById(id).value='');
+    ['mp-n','mp-ds','mp-de','mp-notes','mp-drive'].forEach(id=>{var el=document.getElementById(id);if(el)el.value='';});
     save();renderAll();closeModal('moProject');toast('✓ Projet modifié','s');syncNow();
     return;
   }
-  S.projects.push({id:'p'+Date.now(),name,client:document.getElementById('mp-c').value.trim(),pole:document.getElementById('mp-pole').value,dateStart:document.getElementById('mp-ds').value,dateEnd:document.getElementById('mp-de').value,notes:document.getElementById('mp-notes').value.trim(),driveUrl:drive,parentId:S.curFolder||null,isFolder:false,archived:false,deleted:false,createdAt:Date.now()});
-  ['mp-n','mp-c','mp-ds','mp-de','mp-notes','mp-drive'].forEach(id=>document.getElementById(id).value='');
+  var _pcC=resolveProjClient(); S.projects.push({id:'p'+Date.now(),name,client:_pcC.client,clientId:_pcC.clientId,pole:document.getElementById('mp-pole').value,dateStart:document.getElementById('mp-ds').value,dateEnd:document.getElementById('mp-de').value,notes:document.getElementById('mp-notes').value.trim(),driveUrl:drive,parentId:S.curFolder||null,isFolder:false,archived:false,deleted:false,createdAt:Date.now()});
+  ['mp-n','mp-ds','mp-de','mp-notes','mp-drive'].forEach(id=>{var el=document.getElementById(id);if(el)el.value='';});
   save();renderAll();closeModal('moProject');toast('✓ Projet créé','s');
   syncNow();
 }
@@ -4062,6 +4107,7 @@ function openNewProject(){
   const e=document.getElementById('editProjectId'); if(e)e.value='';
   ['mp-n','mp-c','mp-ds','mp-de','mp-notes','mp-drive'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const ps=document.getElementById('mp-pole'); if(ps)ps.value='';
+  fillProjClientSelect('');
   const t=document.querySelector('#moProject .mt'); if(t)t.textContent='Nouveau projet';
   const b=document.querySelector('#moProject .ma .btn.pri'); if(b)b.textContent='Créer';
   openModal('moProject');
@@ -4071,7 +4117,7 @@ function openEditProject(id){
   const p=S.projects.find(x=>x.id===id); if(!p)return;
   document.getElementById('editProjectId').value=id;
   document.getElementById('mp-n').value=p.name||'';
-  document.getElementById('mp-c').value=p.client||'';
+  fillProjClientSelect(p.clientId||findClientIdByName(p.client)||(p.client?'__keep__':''), p.client);
   const ps=document.getElementById('mp-pole'); if(ps)ps.value=p.pole||'';
   document.getElementById('mp-ds').value=p.dateStart||'';
   document.getElementById('mp-de').value=p.dateEnd||'';
@@ -4303,7 +4349,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.46';
+const APP_VERSION = '5.48';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
