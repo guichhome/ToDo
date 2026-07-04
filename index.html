@@ -2122,6 +2122,7 @@ async function autoImportOnStart(){if(PRIVATE_MODE)return;
     // Import silencieux (juste un log console)
     console.log('[Import] OK:', np, 'projets,', nb, 'tâches');
     console.log('[Import] Succès:', np, 'projets,', nb, 'tâches actives');
+    if(!CU && typeof renderLogin==='function') renderLogin();
 
   }catch(e){
     console.error('[Import] Erreur:', e.message);
@@ -4472,16 +4473,15 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.52';
+const APP_VERSION = '5.53';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
   // Les données seront rechargées depuis Sheets au premier login
   localStorage.removeItem('gh_session');
   sessionStorage.removeItem('gh_session');
-  localStorage.removeItem('gh_erp');
   localStorage.setItem('gh_version', APP_VERSION);
-  console.log('Cache vidé — sera rechargé depuis Sheets au login');
+  console.log('Nouvelle version — données locales conservées, synchro au login');
 }
 
 load();
