@@ -886,6 +886,19 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 /* Point 6 : retirer le client dans l'espace perso */
 .private-mode .fg:has(#mp-client){display:none!important;}
 .private-mode .tlc-cli{display:none!important;}
+
+/* ── WIDGET NOTES ── */
+.notes-mode #mainSection,.notes-mode #polesSection,.notes-mode #adminSection,.notes-mode .sbdiv{display:none!important;}
+.notes-mode .h-right .btn.pri.sm{display:none!important;}
+.notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;}
+.note-card{position:relative;border-radius:var(--r);padding:12px 13px;cursor:pointer;transition:var(--tr);border:1px solid var(--bd);max-height:230px;overflow:hidden;}
+.note-card:hover{box-shadow:var(--sh);transform:translateY(-2px);}
+.note-title{font-size:14px;font-weight:600;color:var(--tx);margin-bottom:5px;padding-right:18px;word-break:break-word;}
+.note-preview{font-size:12px;color:var(--tx);opacity:0.8;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:140px;overflow:hidden;}
+.note-date{font-size:10px;color:var(--tx4);margin-top:8px;font-family:'D-DIN',monospace;}
+.note-pin{position:absolute;top:8px;right:8px;font-size:13px;}
+.note-color-dot{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:var(--tr);}
+.note-color-dot.sel{border-color:var(--tx);transform:scale(1.12);}
 </style>
 </head>
 <body>
@@ -1111,6 +1124,13 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     <div class="pgh"><div><div class="pgt">Clients</div><div class="pgs"><span id="cli-count">0</span> client(s) &middot; carnet d'adresses</div></div><div class="pga"><button class="btn pri sm" onclick="openNewClient()">+ Client</button></div></div>
     <input type="text" class="fi" id="cli-search" placeholder="Rechercher (nom, telephone, email...)" oninput="renderClients()" style="margin-bottom:12px;"/>
     <div id="clientsList"></div>
+  </div>
+
+  <!-- ── NOTES ── -->
+  <div class="page" id="pg-notes">
+    <div class="pgh"><div><div class="pgt">Notes</div><div class="pgs"><span id="notes-count">0</span> note(s) &middot; mémos & rappels</div></div><div class="pga"><button class="btn pri sm" onclick="openNewNote()">+ Note</button></div></div>
+    <input type="text" class="fi" id="notes-search" placeholder="Rechercher dans les notes..." oninput="renderNotes()" style="margin-bottom:12px;"/>
+    <div id="notesList" class="notes-grid"></div>
   </div>
 
   <!-- ── ARCHIVES ── -->
@@ -1413,7 +1433,7 @@ function _privMerge(localArr,cloudArr,isTasks){
 function savePrivateData(){
   if(!PRIVATE_UID) return;
   try{ localStorage.setItem(privateDataKey(PRIVATE_UID), JSON.stringify({
-    tasks:S.tasks, projects:S.projects, templates:S.templates, notifications:S.notifications, tsec:S.tsec, ts:_privTs
+    tasks:S.tasks, projects:S.projects, templates:S.templates, notes:S.notes||[], notifications:S.notifications, tsec:S.tsec, ts:_privTs
   })); }catch(e){}
 }
 function togglePrivateBadge(on){ var b=document.getElementById('privBadge'); if(b) b.style.display=on?'':'none'; }
@@ -1424,7 +1444,7 @@ function enterPrivateMode(uid){
   var d={}; try{ d=JSON.parse(localStorage.getItem(privateDataKey(uid))||'{}'); }catch(e){}
   _privTs=d.ts||0; PRIVATE_SURL=localStorage.getItem('gh_private_surl')||'';
   S.users=[pu];
-  S.tasks=d.tasks||[]; S.projects=d.projects||[]; S.templates=d.templates||[];
+  S.tasks=d.tasks||[]; S.projects=d.projects||[]; S.templates=d.templates||[]; S.notes=d.notes||[];
   S.notifications=d.notifications||[]; S.tsec=d.tsec||0;
   S.curFolder=null; S.tasks.forEach(function(t){t.timerRunning=false;});
   _privReshadow();
@@ -1552,7 +1572,7 @@ async function privateExport(silent){
   var url=privateSurlGet(); if(!url){ if(!silent) toast('Lien de synchro privé non configuré','w'); return; }
   try{
     var u=CU?Object.assign({},CU):null; if(u){ u.pcode=u.pin; }
-    var payload=JSON.stringify({action:'sync',projects:S.projects,tasks:S.tasks,templates:S.templates,users:u?[u]:[],tsec:S.tsec,ts:_privTs||Date.now()});
+    var payload=JSON.stringify({action:'sync',projects:S.projects,tasks:S.tasks,templates:S.templates,notes:S.notes||[],users:u?[u]:[],tsec:S.tsec,ts:_privTs||Date.now()});
     await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:payload});
     if(!silent) toast('✓ Espace privé synchronisé','s');
   }catch(e){ if(!silent) toast('Erreur réseau','e'); }
@@ -1568,7 +1588,7 @@ async function privateImport(silent){
     try{ var _prev=localStorage.getItem(privateDataKey(PRIVATE_UID)); if(_prev) localStorage.setItem(privateDataKey(PRIVATE_UID)+'_bak', _prev); }catch(e){}
     S.projects=_privMerge(S.projects,d.projects,false);
     if(Array.isArray(d.templates)) S.templates=_privMerge(S.templates,d.templates,false);
-    S.tasks=_privMerge(S.tasks,d.tasks,true);
+    S.tasks=_privMerge(S.tasks,d.tasks,true); S.notes=_privMerge(S.notes,d.notes,false);
     if(d.tsec!==undefined) S.tsec=Math.max(S.tsec||0,d.tsec);
     _privTs=Math.max(_privTs||0,d.ts||0);
     _privReshadow();
@@ -1633,7 +1653,7 @@ function save(){
     templates:S.templates,
     notifications:S.notifications,
     tsec:S.tsec,surl:S.surl,theme:S.theme,
-    sidebarOpen:S.sidebarOpen,history:S.history,clients:S.clients||[],
+    sidebarOpen:S.sidebarOpen,history:S.history,clients:S.clients||[],notes:S.notes||[],
   }));
   if(S.surl){
     _savePending = true; // Bloque checkTimestamp pendant l'export
@@ -1674,6 +1694,7 @@ function load(){
       sidebarOpen:d.sidebarOpen!==undefined?d.sidebarOpen:true,
       history:Array.isArray(d.history)?d.history:[],
       clients:Array.isArray(d.clients)?d.clients:[],
+      notes:Array.isArray(d.notes)?d.notes:[],
     });
     S.curFolder=null;
     S.tasks.forEach(t=>t.timerRunning=false);
@@ -2004,14 +2025,14 @@ async function silentImport(){if(PRIVATE_MODE)return;
       };
     });
     if(d.tsec!==undefined) S.tsec=d.tsec;
-    mergeUsersFromSheet(d.users); if(Array.isArray(d.clients)) mergeClientsFromSheet(d.clients);
+    mergeUsersFromSheet(d.users); if(Array.isArray(d.clients)) mergeClientsFromSheet(d.clients); if(Array.isArray(d.notes)) mergeNotesFromSheet(d.notes);
     // Sauvegarde locale sans re-déclencher l'export
     localStorage.setItem('gh_erp',JSON.stringify({
       users:S.users,tasks:S.tasks,projects:S.projects,
       templates:S.templates,
       notifications:S.notifications,
       tsec:S.tsec,surl:S.surl,theme:S.theme,
-      sidebarOpen:S.sidebarOpen,history:S.history,clients:S.clients||[],
+      sidebarOpen:S.sidebarOpen,history:S.history,clients:S.clients||[],notes:S.notes||[],
     }));
     renderAll();
     console.log('[Sync] OK:',d.projects.length,'projets,',d.tasks.filter(t=>!t.deleted&&!t.archived&&!t.done).length,'actives');
@@ -2088,7 +2109,7 @@ async function autoImportOnStart(){if(PRIVATE_MODE)return;
       };
     });
     if(d.tsec !== undefined) S.tsec = d.tsec;
-    mergeUsersFromSheet(d.users); if(Array.isArray(d.clients)) mergeClientsFromSheet(d.clients);
+    mergeUsersFromSheet(d.users); if(Array.isArray(d.clients)) mergeClientsFromSheet(d.clients); if(Array.isArray(d.notes)) mergeNotesFromSheet(d.notes);
 
     save();
     renderAll();
@@ -2125,7 +2146,7 @@ function goPage(p){
   const navEl=document.getElementById('nav-'+p)||document.getElementById('nav-'+p.split('-')[0]+'-'+p.split('-')[1]);
   if(navEl)navEl.classList.add('act');
   // Breadcrumb
-  const labels={dashboard:'Dashboard',kanban:'Kanban',projects:'Projets',all:'Toutes les tâches','my-tasks':'Mes tâches',urgent:'Urgentes',done:'Tâches terminées',stats:'Statistiques',archive:'Archives',admin:'Administration',clients:'Clients',
+  const labels={dashboard:'Dashboard',kanban:'Kanban',projects:'Projets',all:'Toutes les tâches','my-tasks':'Mes tâches',urgent:'Urgentes',done:'Tâches terminées',stats:'Statistiques',archive:'Archives',admin:'Administration',clients:'Clients',notes:'Notes',
     'pole-arch':'Architecture','pole-compta':'Comptabilité','pole-marketing':'Marketing','pole-gestion':'Gestion','pole-atelier':'Atelier','pole-commercial':'Commercial'};
   document.getElementById('bc').innerHTML=`<span class="cur">${labels[p]||p}</span>`;
   // Sur mobile, refermer le tiroir après navigation
@@ -2144,6 +2165,7 @@ function renderPage(p){
   else if(p==='stats')renderStats();
   else if(p==='archive')renderArchive();
   else if(p==='clients')renderClients();
+  else if(p==='notes')renderNotes();
   else if(p==='admin')renderAdmin();
   else if(p.startsWith('pole-'))renderPole(S.curPole);
 }
@@ -4054,6 +4076,120 @@ function resolveProjClient(){
   return {clientId:v, client:c?c.name:''};
 }
 
+var NOTE_COLORS=[
+  {id:'yellow',c:'#E6B800',bg:'rgba(245,197,66,0.13)'},
+  {id:'blue',c:'#3B82F6',bg:'rgba(59,130,246,0.12)'},
+  {id:'green',c:'#2EAA72',bg:'rgba(46,170,114,0.12)'},
+  {id:'pink',c:'#EC4899',bg:'rgba(236,72,153,0.12)'},
+  {id:'purple',c:'#8B5CF6',bg:'rgba(139,92,246,0.12)'},
+  {id:'gray',c:'#94A3B8',bg:'rgba(148,163,184,0.12)'}
+];
+function noteColor(id){ return NOTE_COLORS.find(function(c){return c.id===id;})||NOTE_COLORS[0]; }
+function mergeNotesFromSheet(arr){
+  if(!Array.isArray(arr)) return;
+  if(!S.notes) S.notes=[];
+  arr.forEach(function(sn){
+    if(!sn||!sn.id) return;
+    var ln=S.notes.find(function(x){return x.id===sn.id;});
+    if(ln){ if((sn._upd||0)>(ln._upd||0)){ ln.title=sn.title;ln.content=sn.content;ln.color=sn.color;ln.pinned=sn.pinned;ln._upd=sn._upd||0;ln._deleted=sn._deleted||false; } }
+    else { S.notes.push(sn); }
+  });
+}
+function noteDateLabel(ts){
+  if(!ts) return '';
+  var d=new Date(ts), now=new Date();
+  var sameDay=d.toDateString()===now.toDateString();
+  if(sameDay) return d.getHours()+'h'+String(d.getMinutes()).padStart(2,'0');
+  return d.getDate()+'/'+(d.getMonth()+1);
+}
+function renderNotes(){
+  var list=document.getElementById('notesList'); if(!list) return;
+  var all=(S.notes||[]).filter(function(n){return !n._deleted;});
+  var cEl=document.getElementById('notes-count'); if(cEl) cEl.textContent=all.length;
+  var q=(document.getElementById('notes-search')?document.getElementById('notes-search').value:'').toLowerCase().trim();
+  var ns=all.filter(function(n){ return !q || (n.title||'').toLowerCase().includes(q) || (n.content||'').toLowerCase().includes(q); });
+  ns.sort(function(a,b){ if((b.pinned?1:0)!==(a.pinned?1:0)) return (b.pinned?1:0)-(a.pinned?1:0); return (b._upd||0)-(a._upd||0); });
+  if(!ns.length){ list.innerHTML='<div style="text-align:center;color:var(--tx4);padding:34px 12px;font-size:13px;grid-column:1/-1;">'+(q?'Aucune note trouvée.':'Aucune note pour l\'instant.<br>Clique « + Note » pour en créer une.')+'</div>'; return; }
+  list.innerHTML=ns.map(function(n){
+    var col=noteColor(n.color);
+    var content=(n.content||'');
+    return '<div class="note-card" style="border-top:3px solid '+col.c+';background:'+col.bg+';" onclick="editNote(\''+n.id+'\')">'+
+      (n.pinned?'<div class="note-pin">📌</div>':'')+
+      '<div class="note-title">'+esc(n.title||'(Sans titre)')+'</div>'+
+      (content?'<div class="note-preview">'+esc(content)+'</div>':'')+
+      '<div class="note-date">'+noteDateLabel(n._upd||n.createdAt)+'</div>'+
+    '</div>';
+  }).join('');
+}
+function ensureNoteModal(){
+  if(document.getElementById('moNote')) return;
+  var d=document.createElement('div'); d.className='mo'; d.id='moNote';
+  var dots=NOTE_COLORS.map(function(c){return '<div class="note-color-dot" data-color="'+c.id+'" onclick="pickNoteColor(\''+c.id+'\')" style="background:'+c.c+';"></div>';}).join('');
+  d.innerHTML='<div class="mbox">'+
+    '<div class="mt" id="noteModalTitle">Nouvelle note</div>'+
+    '<input type="hidden" id="editNoteId"/>'+
+    '<input type="hidden" id="noteColor" value="yellow"/>'+
+    '<div class="fg"><label class="fl">Titre</label><input type="text" class="fi" id="note-title" placeholder="Titre de la note"/></div>'+
+    '<div class="fg"><label class="fl">Contenu</label><textarea class="fi" id="note-content" rows="7" placeholder="Écris ta note, une mesure, un rappel..."></textarea></div>'+
+    '<div class="fg"><label class="fl">Couleur</label><div style="display:flex;gap:10px;" id="noteColorRow">'+dots+'</div></div>'+
+    '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:6px;"><input type="checkbox" id="note-pinned" style="width:16px;height:16px;"/> 📌 Épingler en haut</label>'+
+    '<div class="ma">'+
+      '<button class="btn" id="noteDelBtn" onclick="deleteNote()" style="color:#E05528;margin-right:auto;">🗑 Supprimer</button>'+
+      '<button class="btn" onclick="closeModal(\'moNote\')">Annuler</button>'+
+      '<button class="btn pri" onclick="saveNote()">Enregistrer</button>'+
+    '</div>'+
+  '</div>';
+  document.body.appendChild(d);
+}
+function pickNoteColor(id){
+  var h=document.getElementById('noteColor'); if(h)h.value=id;
+  document.querySelectorAll('#noteColorRow .note-color-dot').forEach(function(d){ d.classList.toggle('sel', d.getAttribute('data-color')===id); });
+}
+function openNewNote(){
+  ensureNoteModal();
+  document.getElementById('editNoteId').value='';
+  document.getElementById('note-title').value='';
+  document.getElementById('note-content').value='';
+  document.getElementById('note-pinned').checked=false;
+  document.getElementById('noteModalTitle').textContent='Nouvelle note';
+  document.getElementById('noteDelBtn').style.display='none';
+  pickNoteColor('yellow');
+  openModal('moNote');
+  setTimeout(function(){var e=document.getElementById('note-title');if(e)e.focus();},100);
+}
+function editNote(id){
+  ensureNoteModal();
+  var n=(S.notes||[]).find(function(x){return x.id===id;}); if(!n) return;
+  document.getElementById('editNoteId').value=id;
+  document.getElementById('note-title').value=n.title||'';
+  document.getElementById('note-content').value=n.content||'';
+  document.getElementById('note-pinned').checked=!!n.pinned;
+  document.getElementById('noteModalTitle').textContent='Modifier la note';
+  document.getElementById('noteDelBtn').style.display='';
+  pickNoteColor(n.color||'yellow');
+  openModal('moNote');
+}
+function saveNote(){
+  var title=document.getElementById('note-title').value.trim();
+  var content=document.getElementById('note-content').value.trim();
+  if(!title && !content){ toast('Note vide','e'); return; }
+  var id=document.getElementById('editNoteId').value;
+  var data={title:title, content:content, color:document.getElementById('noteColor').value||'yellow', pinned:document.getElementById('note-pinned').checked, _upd:Date.now(), _deleted:false};
+  if(!S.notes) S.notes=[];
+  if(id){ var n=S.notes.find(function(x){return x.id===id;}); if(n) Object.assign(n,data); toast('✓ Note mise à jour','s'); }
+  else { S.notes.push(Object.assign({id:'note'+Date.now(), createdAt:Date.now()}, data)); toast('✓ Note créée','s'); }
+  save(); if(!PRIVATE_MODE && typeof syncNow==='function') syncNow();
+  closeModal('moNote'); renderNotes();
+}
+function deleteNote(){
+  var id=document.getElementById('editNoteId').value; if(!id) return;
+  if(!confirm('Supprimer cette note ?')) return;
+  var n=(S.notes||[]).find(function(x){return x.id===id;}); if(!n) return;
+  n._deleted=true; n._upd=Date.now();
+  save(); if(!PRIVATE_MODE && typeof syncNow==='function') syncNow();
+  closeModal('moNote'); renderNotes(); toast('Note supprimée','i');
+}
+
 function saveProject(){
   const name=document.getElementById('mp-n').value.trim();if(!name){toast('Entrez un nom','e');return;}
   var drive=document.getElementById('mp-drive').value.trim();if(drive&&!/^https?:\/\//i.test(drive))drive='https://'+drive;
@@ -4227,6 +4363,7 @@ async function expSheets(url, silent=false){if(PRIVATE_MODE)return;
       tasks:S.tasks,
       templates:S.templates,
       clients:S.clients||[],
+      notes:S.notes||[],
       users:S.users.map(u=>{const uu={...u};delete uu.pin;return uu;}),
       tsec:S.tsec,
       ts:ts
@@ -4258,7 +4395,7 @@ async function impSheets(url){
     let np=0,nt=0;
     (d.projects||[]).forEach(p=>{if(!S.projects.find(x=>x.id===p.id)){S.projects.push(p);np++;}});
     (d.tasks||[]).forEach(t=>{if(!S.tasks.find(x=>x.id===t.id)){S.tasks.push(t);nt++;}});
-    mergeUsersFromSheet(d.users); if(Array.isArray(d.clients)) mergeClientsFromSheet(d.clients);
+    mergeUsersFromSheet(d.users); if(Array.isArray(d.clients)) mergeClientsFromSheet(d.clients); if(Array.isArray(d.notes)) mergeNotesFromSheet(d.notes);
     save();renderAll();
     toast('✓ '+np+' projet(s) et '+nt+' tâche(s) importés','s');
     addNotif('Sync Sheets','Import réussi: '+np+' projets, '+nt+' tâches','s');
@@ -4335,7 +4472,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.51';
+const APP_VERSION = '5.52';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
@@ -4366,6 +4503,7 @@ const WIDGETS=[
   {id:'stats',name:'Statistiques',desc:'Rendements, temps & performance',ico:'📈',color:'#7c3aed',bg:'#f1ecfb',active:true},
   {id:'quotes',name:'Devis',desc:'Création et suivi des devis clients',ico:'📄',color:'#3a7bd4',bg:'#e8f0fa',active:false},
   {id:'clients',name:'Clients',desc:"Carnet d'adresses et historique clients",ico:'👥',color:'#5fa85f',bg:'#ecf7ec',active:true},
+  {id:'notes',name:'Notes',desc:'Notes, mémos & rappels',ico:'📝',color:'#e6a817',bg:'#fbf3e0',active:true},
   {id:'planning',name:'Planning',desc:'Agenda chantiers & équipe',ico:'📅',color:'#c0504e',bg:'#faecec',active:false},
   {id:'stock',name:'Stock',desc:'Inventaire matériaux & fournitures',ico:'📦',color:'#9b59b6',bg:'#f3ecf7',active:false},
   {id:'billing',name:'Facturation',desc:'Factures & encaissements',ico:'💶',color:'#16a085',bg:'#e8f6f3',active:false},
@@ -4403,6 +4541,7 @@ function enterHome(){ renderHome(); showScreen('home'); }
 function setAppBrand(t){var b=document.getElementById("appBrand");if(b)b.textContent=t||"Tâches";}
 function openWidget(id){
   var app=document.getElementById('app');
+  if(app) app.classList.remove('admin-mode','stats-mode','clients-mode','notes-mode');
   if(id==='admin'){
     if(!(CU&&CU.role==='admin')){ if(typeof toast==='function')toast('Réservé aux administrateurs','w'); return; }
     if(app){app.classList.remove('stats-mode','clients-mode');app.classList.add('admin-mode');}
@@ -4418,6 +4557,14 @@ function openWidget(id){
     showScreen('app');
     if(typeof applySidebarState==='function') applySidebarState();
     goPage('stats');
+    return;
+  }
+  if(id==='notes'){
+    if(app){app.classList.add('notes-mode');}
+    setAppBrand('Notes');
+    showScreen('app');
+    if(typeof applySidebarState==='function') applySidebarState();
+    goPage('notes');
     return;
   }
   if(id==='clients'){
