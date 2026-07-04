@@ -899,6 +899,14 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .note-pin{position:absolute;top:8px;right:8px;font-size:13px;}
 .note-color-dot{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:var(--tr);}
 .note-color-dot.sel{border-color:var(--tx);transform:scale(1.12);}
+
+/* ── FICHE CLIENT ── */
+.cd-section{background:var(--sf2);border:1px solid var(--bd);border-radius:var(--rs);padding:11px 13px;margin-bottom:10px;}
+.cd-row{font-size:13px;color:var(--tx);padding:3px 0;line-height:1.5;}
+.cd-title{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--tx3);margin-bottom:7px;font-weight:700;}
+.cd-item{font-size:13px;color:var(--tx);padding:8px 10px;border-radius:8px;cursor:pointer;transition:var(--tr);}
+.cd-item:hover{background:var(--brand-xs);color:var(--brand);}
+.cd-empty{font-size:12px;color:var(--tx4);padding:3px 0;}
 </style>
 </head>
 <body>
@@ -3954,7 +3962,7 @@ function renderClients(){
     var contact=[];
     if(c.phone) contact.push('📞 '+esc(c.phone));
     if(c.email) contact.push('✉ '+esc(c.email));
-    return '<div class="cli-card" onclick="editClient(\''+c.id+'\')">'+
+    return '<div class="cli-card" onclick="openClientDetail(\''+c.id+'\')">'+
       '<div class="cli-av">'+esc(ini)+'</div>'+
       '<div class="cli-body">'+
         '<div class="cli-name">'+esc(c.name)+'</div>'+
@@ -4132,6 +4140,7 @@ function ensureNoteModal(){
     '<input type="hidden" id="noteColor" value="yellow"/>'+
     '<div class="fg"><label class="fl">Titre</label><input type="text" class="fi" id="note-title" placeholder="Titre de la note"/></div>'+
     '<div class="fg"><label class="fl">Contenu</label><textarea class="fi" id="note-content" rows="7" placeholder="Écris ta note, une mesure, un rappel..."></textarea></div>'+
+    '<div class="fr"><div class="fg"><label class="fl">Client</label><select class="fi" id="note-client" onchange="onNoteClientChange()"></select></div><div class="fg"><label class="fl">Projet / Dossier</label><select class="fi" id="note-project"></select></div></div>'+
     '<div class="fg"><label class="fl">Couleur</label><div style="display:flex;gap:10px;" id="noteColorRow">'+dots+'</div></div>'+
     '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:6px;"><input type="checkbox" id="note-pinned" style="width:16px;height:16px;"/> 📌 Épingler en haut</label>'+
     '<div class="ma">'+
@@ -4154,7 +4163,7 @@ function openNewNote(){
   document.getElementById('note-pinned').checked=false;
   document.getElementById('noteModalTitle').textContent='Nouvelle note';
   document.getElementById('noteDelBtn').style.display='none';
-  pickNoteColor('yellow');
+  pickNoteColor('yellow'); fillNoteClientSelect(''); fillNoteProjectSelect('');
   openModal('moNote');
   setTimeout(function(){var e=document.getElementById('note-title');if(e)e.focus();},100);
 }
@@ -4167,7 +4176,7 @@ function editNote(id){
   document.getElementById('note-pinned').checked=!!n.pinned;
   document.getElementById('noteModalTitle').textContent='Modifier la note';
   document.getElementById('noteDelBtn').style.display='';
-  pickNoteColor(n.color||'yellow');
+  pickNoteColor(n.color||'yellow'); fillNoteClientSelect(n.clientId||''); fillNoteProjectSelect(n.projectId||'');
   openModal('moNote');
 }
 function saveNote(){
@@ -4175,7 +4184,7 @@ function saveNote(){
   var content=document.getElementById('note-content').value.trim();
   if(!title && !content){ toast('Note vide','e'); return; }
   var id=document.getElementById('editNoteId').value;
-  var data={title:title, content:content, color:document.getElementById('noteColor').value||'yellow', pinned:document.getElementById('note-pinned').checked, _upd:Date.now(), _deleted:false};
+  var _ncid=(document.getElementById('note-client')||{}).value||''; if(_ncid==='__new__')_ncid=''; var _npid=(document.getElementById('note-project')||{}).value||''; var data={title:title, content:content, color:document.getElementById('noteColor').value||'yellow', pinned:document.getElementById('note-pinned').checked, clientId:_ncid, projectId:_npid, _upd:Date.now(), _deleted:false};
   if(!S.notes) S.notes=[];
   if(id){ var n=S.notes.find(function(x){return x.id===id;}); if(n) Object.assign(n,data); toast('✓ Note mise à jour','s'); }
   else { S.notes.push(Object.assign({id:'note'+Date.now(), createdAt:Date.now()}, data)); toast('✓ Note créée','s'); }
@@ -4189,6 +4198,70 @@ function deleteNote(){
   n._deleted=true; n._upd=Date.now();
   save(); if(!PRIVATE_MODE && typeof syncNow==='function') syncNow();
   closeModal('moNote'); renderNotes(); toast('Note supprimée','i');
+}
+
+function fillNoteClientSelect(sel){
+  var el=document.getElementById('note-client'); if(!el) return;
+  var cls=(S.clients||[]).filter(function(c){return !c._deleted;}).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+  el.innerHTML='<option value="">— Aucun —</option>'+cls.map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+'</option>';}).join('')+'<option value="__new__">➕ Nouveau client…</option>';
+  el.value=sel||'';
+}
+function onNoteClientChange(){
+  var el=document.getElementById('note-client'); if(!el||el.value!=='__new__') return;
+  var nm=prompt('Nom du nouveau client :'); if(nm===null||!nm.trim()){el.value='';return;}
+  nm=nm.trim();
+  if(!S.clients)S.clients=[];
+  var ex=(S.clients||[]).find(function(c){return !c._deleted&&(c.name||'').toLowerCase()===nm.toLowerCase();});
+  var cid; if(ex){cid=ex.id;} else {cid='cli'+Date.now();S.clients.push({id:cid,name:nm,phone:'',email:'',address:'',notes:'',createdAt:Date.now(),_upd:Date.now(),_deleted:false});save();if(!PRIVATE_MODE&&typeof syncNow==='function')syncNow();if(typeof toast==='function')toast('✓ Client créé','s');}
+  fillNoteClientSelect(cid);
+}
+function fillNoteProjectSelect(sel){
+  var el=document.getElementById('note-project'); if(!el) return;
+  var ps=(S.projects||[]).filter(function(p){return !p.deleted&&!p.archived;}).sort(function(a,b){return (a.isFolder?0:1)-(b.isFolder?0:1)||(a.name||'').localeCompare(b.name||'');});
+  el.innerHTML='<option value="">— Aucun —</option>'+ps.map(function(p){return '<option value="'+p.id+'">'+(p.isFolder?'📁 ':'')+esc(p.name)+'</option>';}).join('');
+  el.value=sel||'';
+}
+function ensureClientDetailModal(){
+  if(document.getElementById('moCliDetail')) return;
+  var d=document.createElement('div'); d.className='mo'; d.id='moCliDetail';
+  d.innerHTML='<div class="mbox" style="max-width:560px;"><div id="cliDetailBody"></div><div class="ma"><button class="btn" id="cliDetailDel" style="color:#E05528;margin-right:auto;">🗑 Supprimer</button><button class="btn" onclick="closeModal(\'moCliDetail\')">Fermer</button><button class="btn pri" id="cliDetailEdit">✏ Modifier</button></div></div>';
+  document.body.appendChild(d);
+}
+function openClientDetail(id){
+  ensureClientDetailModal();
+  var c=(S.clients||[]).find(function(x){return x.id===id;}); if(!c) return;
+  renderClientDetail(c);
+  document.getElementById('cliDetailEdit').onclick=function(){ closeModal('moCliDetail'); editClient(id); };
+  document.getElementById('cliDetailDel').onclick=function(){ if(!confirm('Supprimer le client « '+(c.name||'')+' » ? Les projets liés ne sont pas supprimés.'))return; c._deleted=true;c._upd=Date.now();save();if(!PRIVATE_MODE&&typeof syncNow==='function')syncNow();closeModal('moCliDetail');renderClients();if(typeof toast==='function')toast('Client supprimé','i'); };
+  openModal('moCliDetail');
+}
+function renderClientDetail(c){
+  var body=document.getElementById('cliDetailBody'); if(!body) return;
+  var ini=(c.name||'?').trim().slice(0,2).toUpperCase();
+  var projs=(S.projects||[]).filter(function(p){return !p.deleted&&!p.isFolder&&(p.clientId===c.id||(!p.clientId&&p.client&&p.client===c.name));});
+  var folders=(S.projects||[]).filter(function(p){return !p.deleted&&p.isFolder&&(p.clientId===c.id||(!p.clientId&&p.client&&p.client===c.name));});
+  var notes=(S.notes||[]).filter(function(n){return !n._deleted&&n.clientId===c.id;});
+  var h='<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">'+
+     '<div class="cli-av" style="width:54px;height:54px;font-size:19px;">'+esc(ini)+'</div>'+
+     '<div style="min-width:0;"><div style="font-size:19px;font-weight:700;color:var(--tx);word-break:break-word;">'+esc(c.name)+'</div><div style="font-size:12px;color:var(--tx3);">Fiche client</div></div>'+
+   '</div>';
+  var contact='';
+  if(c.phone) contact+='<div class="cd-row">📞 <a href="tel:'+esc(c.phone)+'" style="color:var(--brand);text-decoration:none;">'+esc(c.phone)+'</a></div>';
+  if(c.email) contact+='<div class="cd-row">✉ <a href="mailto:'+esc(c.email)+'" style="color:var(--brand);text-decoration:none;">'+esc(c.email)+'</a></div>';
+  if(c.address) contact+='<div class="cd-row">📍 '+esc(c.address)+'</div>';
+  if(c.notes) contact+='<div class="cd-row" style="opacity:.85;white-space:pre-wrap;">📝 '+esc(c.notes)+'</div>';
+  h+='<div class="cd-section">'+(contact||'<div class="cd-empty">Aucune coordonnée renseignée</div>')+'</div>';
+  h+='<div class="cd-section"><div class="cd-title">Projets & dossiers ('+(projs.length+folders.length)+')</div>';
+  if(projs.length+folders.length){
+    h+=folders.map(function(p){return '<div class="cd-item" onclick="closeModal(\''+'moCliDetail'+'\');openWidget(\'tasks\');openProject(\''+p.id+'\')">📁 '+esc(p.name)+'</div>';}).join('');
+    h+=projs.map(function(p){return '<div class="cd-item" onclick="closeModal(\''+'moCliDetail'+'\');openWidget(\'tasks\');openProject(\''+p.id+'\')">🏗 '+esc(p.name)+'</div>';}).join('');
+  } else h+='<div class="cd-empty">Aucun projet lié</div>';
+  h+='</div>';
+  h+='<div class="cd-section"><div class="cd-title">Notes ('+notes.length+')</div>';
+  if(notes.length) h+=notes.map(function(n){return '<div class="cd-item" onclick="closeModal(\''+'moCliDetail'+'\');openWidget(\'notes\');editNote(\''+n.id+'\')">📝 '+esc(n.title||'(Sans titre)')+'</div>';}).join('');
+  else h+='<div class="cd-empty">Aucune note liée</div>';
+  h+='</div>';
+  body.innerHTML=h;
 }
 
 function saveProject(){
@@ -4473,7 +4546,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.53';
+const APP_VERSION = '5.54';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
