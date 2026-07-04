@@ -1287,6 +1287,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     <div class="fg"><label class="fl">Couleur avatar</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;" id="colorPicker"></div>
     </div>
+    <div class="fg"><label class="fl">Accès aux widgets</label><div style="font-size:11px;color:var(--tx3);margin:-2px 0 6px;">Coche les widgets accessibles à cet utilisateur. Les admins voient tout.</div><div id="mu-widgets" style="display:flex;flex-direction:column;gap:3px;"></div></div>
     <div class="ma"><button class="btn" onclick="closeModal('moUser')">Annuler</button><button class="btn pri" onclick="saveUser()">Enregistrer</button></div>
   </div>
 </div>
@@ -2061,6 +2062,7 @@ function mergeUsersFromSheet(arr){
         if(su.role!==undefined) lu.role=su.role;
         if(su.pole!==undefined) lu.pole=su.pole;
         if(su.color!==undefined) lu.color=su.color;
+        if(su.widgets!==undefined) lu.widgets=su.widgets;
         lu._upd=su._upd||0;
       }
     } else {
@@ -3393,7 +3395,7 @@ function renderAdmin(){
     <div class="admin-card">
       <div class="admin-card-hd">
         <div class="admin-card-title">👥 Utilisateurs</div>
-        <button class="btn pri sm" onclick="openModal('moUser');document.getElementById('editUserId').value='';">+ Ajouter</button>
+        <button class="btn pri sm" onclick="openNewUser();">+ Ajouter</button>
       </div>
       <div class="admin-card-body">
         ${S.users.map(u=>`<div class="user-row">
@@ -3446,6 +3448,7 @@ function openEditUser(id){
   populatePoleSelect('mu-pole');
   document.getElementById('mu-pole').value=u.pole||'';
   renderColorPicker(u.color);
+  renderUserWidgets(u.widgets);
   document.getElementById('moUserTitle').textContent='Modifier l\'utilisateur';
   openModal('moUser');
 }
@@ -4264,6 +4267,31 @@ function renderClientDetail(c){
   body.innerHTML=h;
 }
 
+function renderUserWidgets(sel){
+  var box=document.getElementById('mu-widgets'); if(!box) return;
+  var ws=(typeof WIDGETS!=='undefined')?WIDGETS.filter(function(w){return w.active&&!w.adminOnly;}):[];
+  var allowed=(sel===undefined||sel===null)?null:sel;
+  box.innerHTML=ws.map(function(w){
+    var checked=(allowed===null)?true:(allowed.indexOf(w.id)>=0);
+    return '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:3px 0;"><input type="checkbox" class="mu-wchk" value="'+w.id+'" '+(checked?'checked':'')+' style="width:15px;height:15px;flex-shrink:0;"/> <span>'+w.ico+' '+esc(w.name)+'</span></label>';
+  }).join('');
+}
+function getSelectedUserWidgets(){
+  return [].slice.call(document.querySelectorAll('#mu-widgets .mu-wchk:checked')).map(function(c){return c.value;});
+}
+function openNewUser(){
+  document.getElementById('editUserId').value='';
+  document.getElementById('mu-name').value='';
+  document.getElementById('mu-init').value='';
+  document.getElementById('mu-role').value='employee';
+  populatePoleSelect('mu-pole'); var mp=document.getElementById('mu-pole'); if(mp)mp.value='';
+  document.getElementById('mu-pin').value='';
+  renderColorPicker(AVATAR_COLORS[0]);
+  renderUserWidgets(undefined);
+  document.getElementById('moUserTitle').textContent='Nouvel utilisateur';
+  openModal('moUser');
+}
+
 function saveProject(){
   const name=document.getElementById('mp-n').value.trim();if(!name){toast('Entrez un nom','e');return;}
   var drive=document.getElementById('mp-drive').value.trim();if(drive&&!/^https?:\/\//i.test(drive))drive='https://'+drive;
@@ -4333,11 +4361,11 @@ function saveUser(){
   const initials=document.getElementById('mu-init').value.trim().toUpperCase().slice(0,2)||name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   if(editId){
     const u=S.users.find(x=>x.id===editId);
-    if(u){Object.assign(u,{name,initials,role:document.getElementById('mu-role').value,pole:document.getElementById('mu-pole').value,color:selColor});if(pin)u.pin=pin;u._upd=Date.now();}
+    if(u){Object.assign(u,{name,initials,role:document.getElementById('mu-role').value,pole:document.getElementById('mu-pole').value,color:selColor});if(pin)u.pin=pin;u.widgets=getSelectedUserWidgets();u._upd=Date.now();}
     toast('✓ Utilisateur mis à jour','s');
   }else{
     if(!pin){toast('Entrez un PIN','e');return;}
-    S.users.push({id:'u'+Date.now(),name,initials,role:document.getElementById('mu-role').value,pole:document.getElementById('mu-pole').value,color:selColor,pin,createdAt:Date.now(),_upd:Date.now()});
+    S.users.push({id:'u'+Date.now(),name,initials,role:document.getElementById('mu-role').value,pole:document.getElementById('mu-pole').value,color:selColor,pin,widgets:getSelectedUserWidgets(),createdAt:Date.now(),_upd:Date.now()});
     toast('✓ Utilisateur créé','s');
   }
   save();if(!PRIVATE_MODE && typeof syncNow==='function')syncNow();renderAdmin();closeModal('moUser');
@@ -4546,7 +4574,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.54';
+const APP_VERSION = '5.56';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
@@ -4584,7 +4612,14 @@ const WIDGETS=[
 ];
 function renderWidgets(){
   var g=document.getElementById('widgetGrid'); if(!g)return;
-  var WLIST=PRIVATE_MODE?WIDGETS.filter(function(w){return w.id==='tasks'||w.id==='notes';}):WIDGETS.filter(function(w){return !w.adminOnly||(CU&&CU.role==='admin');});
+  var WLIST=PRIVATE_MODE?WIDGETS.filter(function(w){return w.id==='tasks'||w.id==='notes';}):WIDGETS.filter(function(w){
+    var isAdmin=CU&&CU.role==='admin';
+    if(w.adminOnly) return isAdmin;
+    if(!w.active) return isAdmin;
+    if(!CU||isAdmin||CU.widgets===undefined) return true;
+    return (CU.widgets||[]).indexOf(w.id)>=0;
+  });
+  if(!PRIVATE_MODE) WLIST=WLIST.slice().sort(function(a,b){return (b.active?1:0)-(a.active?1:0);});
   g.innerHTML=WLIST.map(function(w){
     var style='--wc:'+w.color+';--wc-bg:'+w.bg+';';
     if(w.active) return '<div class="widget" style="'+style+'" onclick="openWidget(\''+w.id+'\')"><div class="w-ico">'+w.ico+'</div><div class="w-name">'+esc(w.name)+'</div><div class="w-desc">'+esc(w.desc)+'</div><div class="w-go">Ouvrir →</div></div>';
