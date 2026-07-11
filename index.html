@@ -1302,6 +1302,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     </div>
     <div class="fr">
       <div class="fg"><label class="fl">Date début</label><input type="date" class="fi" id="mt-dstart"/></div>
+      <div class="fg"><label class="fl">Heure</label><input type="time" class="fi" id="mt-time" step="900"/></div>
       <div class="fg"><label class="fl">Date fin</label><input type="date" class="fi" id="mt-dend"/></div>
     </div>
     <div class="fg"><label class="fl">Notes</label><textarea class="fta" id="mt-notes" placeholder="Informations complémentaires..."></textarea></div>
@@ -2869,7 +2870,7 @@ function renderDetail(){
   if(S.df==='urgent')act=act.filter(t=>t.priority==='urgent');
   else if(S.df==='normal')act=act.filter(t=>t.priority==='normal');
   else if(S.df==='running')act=act.filter(t=>t.timerRunning);
-  act.sort((a,b)=>a.priority==='urgent'?-1:1);
+  act=sortTasksByPlan(act);
   const show=[...act,...all.filter(t=>t.done&&!t.archived)];
   document.getElementById('det-tasks').innerHTML=show.length?show.map(t=>tcardLine(t,false)).join(''):'<div class="empty"><div class="ei">📋</div><h3>Aucune tâche</h3></div>';
   const arch=S.tasks.filter(t=>t.project===p.id&&t.archived&&!t.deleted);
@@ -2893,6 +2894,7 @@ function renderAllTasks(){
   else if(S.gf==='running')tasks=tasks.filter(t=>t.timerRunning);
   else if(S.gf==='todo')tasks=tasks.filter(t=>!t.done);
   if(q)tasks=tasks.filter(t=>t.name.toLowerCase().includes(q.toLowerCase())||(t.notes||'').toLowerCase().includes(q.toLowerCase()));
+  tasks=sortTasksByPlan(tasks);
   const el=document.getElementById('globalList');
   if(!tasks.length){el.innerHTML='<div class="empty"><div class="ei">📋</div><h3>Aucune tâche</h3></div>';return;}
   const bp={};tasks.forEach(t=>{const k=t.project||'__';(bp[k]=bp[k]||[]).push(t);});
@@ -2925,7 +2927,7 @@ function computeDaySchedule(dayTasks, dayStartMin){
     var pt=rmTimeToMin(t.planTime);
     var start=(pt!=null)?pt:cur;
     if(start>=PLAN_LUNCH_S && start<PLAN_LUNCH_E) start=PLAN_LUNCH_E;
-    var dur=t.estimate||0;
+    var dur=taskDur(t);
     var end=start+dur; cur=end;
     return {task:t,start:start,end:end,dur:dur,manual:pt!=null};
   });
@@ -3070,6 +3072,7 @@ function renderPlanWeek(){
   var dayStartMin=rmTimeToMin(S.dayStart||'09:00'); if(dayStartMin==null)dayStartMin=540;
   renderPlanControls();
   var days=rmWeekDays(_planWeekOffset);
+  days.forEach(function(d){ replanDay(rmDateKey(d)); });
   var todayKey=rmDateKey(new Date());
   var dayNames=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
   var gridH=(PLAN_H1-PLAN_H0)*PLAN_PXH;
@@ -3084,14 +3087,13 @@ function renderPlanWeek(){
     _planUsers.forEach(function(uid){
       var u=S.users.find(function(x){return x.id===uid;}); if(!u)return;
       var ut=S.tasks.filter(function(t){return !t.archived&&!t.deleted&&!t.done&&t.dateStart===key&&t.assignees&&t.assignees.indexOf(uid)>=0;});
-      ut.sort(function(a,b){return S.tasks.indexOf(a)-S.tasks.indexOf(b);});
-      computeDaySchedule(ut,dayStartMin).forEach(function(x){ dayBlocks.push({task:x.task,start:x.start,end:x.end,color:u.color,uname:u.name}); });
+      ut.forEach(function(t){ var st=rmTimeToMin(t.planTime); if(st==null)st=dayStartMin(); dayBlocks.push({task:t,start:st,end:st+taskDur(t),color:u.color,uname:u.name}); });
     });
     planAssignLanes(dayBlocks);
     var maxLane=b_maxlane||1;
     var blocksHtml=dayBlocks.map(function(b){
       var top=Math.max(0,planMinToY(b.start));
-      var hh=Math.max(15,(b.end-b.start)*(PLAN_PXH/60));
+      var hh=Math.max(22,(b.end-b.start)*(PLAN_PXH/60));
       var w=100/maxLane;
       var canMove=planCanMove(b.task);
       var multi=_planUsers.length>1;
@@ -3120,17 +3122,79 @@ function planDrop(e,key){
   var t=S.tasks.find(function(x){return x.id===id;}); if(!t||!planCanMove(t)){planDragEnd(e);return;}
   var grid=e.currentTarget; var rect=grid.getBoundingClientRect();
   var y=e.clientY-rect.top;
-  var min=Math.round((y/(PLAN_PXH/60))+PLAN_H0*60);
-  min=Math.round(min/15)*15;
-  if(min<PLAN_H0*60)min=PLAN_H0*60;
-  if(min>=PLAN_LUNCH_S && min<PLAN_LUNCH_E) min=PLAN_LUNCH_E;
-  t.dateStart=key; t.planTime=rmMinToTime(min); t._upd=Date.now();
-  save(); if(!PRIVATE_MODE&&typeof syncNow==='function')syncNow(); planDragEnd(e); renderPlanning();
+  var min=(y/(PLAN_PXH/60))+PLAN_H0*60;
+  scheduleTaskAt(id, key, min);
+  planDragEnd(e); renderPlanning();
 }
 function planToggleUser(id){ planInitUsers(); var i=_planUsers.indexOf(id); if(i>=0)_planUsers.splice(i,1); else _planUsers.push(id); if(!_planUsers.length&&CU)_planUsers=[CU.id]; renderPlanning(); }
 function planSelectMe(){ _planUsers=CU?[CU.id]:[]; renderPlanning(); }
 function planSelectAll(){ _planUsers=planActiveUsers().map(function(u){return u.id;}); renderPlanning(); }
 function planWeekNav(dir){ if(dir===0)_planWeekOffset=0; else _planWeekOffset+=dir; renderPlanning(); }
+var PLAN_DEFAULT_DUR=60;
+function taskDur(t){ return (t.estimate&&t.estimate>0)?t.estimate:PLAN_DEFAULT_DUR; }
+function dayStartMin(){ var m=rmTimeToMin(S.dayStart||'09:00'); return (m==null)?540:m; }
+function skipLunch(start,dur){
+  if(start<PLAN_LUNCH_S && start+dur>PLAN_LUNCH_S) return PLAN_LUNCH_E;
+  if(start>=PLAN_LUNCH_S && start<PLAN_LUNCH_E) return PLAN_LUNCH_E;
+  return start;
+}
+function replanDay(dayKey){
+  if(!dayKey) return;
+  var tasks=S.tasks.filter(function(t){return !t.archived&&!t.deleted&&!t.done&&t.dateStart===dayKey;});
+  if(!tasks.length) return;
+  tasks.sort(function(a,b){
+    var am=rmTimeToMin(a.planTime), bm=rmTimeToMin(b.planTime);
+    if(am==null)am=99999; if(bm==null)bm=99999;
+    if(am!==bm) return am-bm;
+    return (a._planSeq||0)-(b._planSeq||0);
+  });
+  var cur=dayStartMin();
+  tasks.forEach(function(t){
+    var dur=taskDur(t);
+    var want=rmTimeToMin(t.planTime);
+    var start=(want!=null && want>cur)?want:cur;
+    start=skipLunch(start,dur);
+    var nt=rmMinToTime(start);
+    if(t.planTime!==nt){ t.planTime=nt; t._upd=Date.now(); }
+    cur=start+dur;
+  });
+}
+function replanAllDays(){
+  var days={};
+  S.tasks.forEach(function(t){ if(!t.archived&&!t.deleted&&!t.done&&t.dateStart) days[t.dateStart]=1; });
+  Object.keys(days).forEach(replanDay);
+}
+function taskSortKey(t){
+  if(!t.dateStart) return 9e15;
+  var d=new Date(t.dateStart+'T00:00').getTime();
+  var m=rmTimeToMin(t.planTime); if(m==null)m=dayStartMin();
+  return d+m*60000;
+}
+function sortTasksByPlan(arr){
+  return arr.slice().sort(function(a,b){
+    var ka=taskSortKey(a), kb=taskSortKey(b);
+    if(ka!==kb) return ka-kb;
+    if(!!a.done!==!!b.done) return a.done?1:-1;
+    return (a.name||'').localeCompare(b.name||'');
+  });
+}
+function scheduleTaskAt(taskId, dayKey, minutes){
+  var t=S.tasks.find(function(x){return x.id===taskId;}); if(!t) return;
+  var oldDay=t.dateStart;
+  t.dateStart=dayKey||'';
+  if(dayKey){
+    var m=Math.round(minutes/15)*15;
+    if(m<dayStartMin())m=dayStartMin();
+    t.planTime=rmMinToTime(m);
+    t._planSeq=0;
+    S.tasks.forEach(function(x){ if(x!==t && x.dateStart===dayKey) x._planSeq=1; });
+  } else { t.planTime=''; }
+  t._upd=Date.now();
+  if(dayKey) replanDay(dayKey);
+  if(oldDay && oldDay!==dayKey) replanDay(oldDay);
+  save(); if(!PRIVATE_MODE&&typeof syncNow==='function') syncNow();
+}
+
 function renderMyTasks(){
   if(!CU)return;
   var el=document.getElementById('myTasksList'); if(!el)return;
@@ -3141,12 +3205,10 @@ function renderMyTasks(){
   var unscheduled=myTasks.filter(function(t){return !t.dateStart;});
   // calculer l'heure de début de chaque tâche planifiée (par jour)
   var byDay={}; scheduled.forEach(function(t){ (byDay[t.dateStart]=byDay[t.dateStart]||[]).push(t); });
-  Object.keys(byDay).forEach(function(day){
-    var dt=byDay[day].sort(function(a,b){return S.tasks.indexOf(a)-S.tasks.indexOf(b);});
-    computeDaySchedule(dt,dayStartMin).forEach(function(x){ x.task._startMin=x.start; });
-  });
+  Object.keys(byDay).forEach(function(day){ replanDay(day); });
+  scheduled.forEach(function(t){ t._startMin=rmTimeToMin(t.planTime); });
   // trier par date+heure décroissant (plus récent → plus ancien)
-  scheduled.sort(function(a,b){ if(a.dateStart!==b.dateStart) return b.dateStart.localeCompare(a.dateStart); return (b._startMin||0)-(a._startMin||0); });
+  scheduled=sortTasksByPlan(scheduled);
   var html='<div class="mt-cols">';
   html+='<div class="mt-col"><div class="mt-col-head">📅 Planifié <span class="rm-count">'+scheduled.length+'</span></div><div class="mt-col-body">';
   html+= scheduled.length ? scheduled.map(mtTaskRow).join('') : '<div class="rm-empty">Aucune tâche planifiée. Ajoute une date à une tâche (ou utilise le Planning).</div>';
@@ -3159,7 +3221,7 @@ function renderMyTasks(){
 }
 // ── URGENT PAGE ──
 function renderUrgentPage(){
-  const tasks=S.tasks.filter(t=>t.priority==='urgent'&&!t.done&&!t.archived&&!t.deleted);
+  const tasks=sortTasksByPlan(S.tasks.filter(t=>t.priority==='urgent'&&!t.done&&!t.archived&&!t.deleted));
   document.getElementById('urgentList').innerHTML=tasks.length?tasks.map(t=>tcardLine(t,false)).join(''):'<div class="empty"><div class="ei">✅</div><h3>Aucune urgente !</h3><p>Tout est sous contrôle.</p></div>';
 }
 
@@ -3913,7 +3975,7 @@ function openNewTask(){
   document.getElementById('mt-tplId').value='';
   document.getElementById('mt-tplsearch').value='';
   const dd=document.getElementById('tplDropdown');if(dd)dd.style.display='none';
-  document.getElementById('mt-notes').value='';var _mdn=document.getElementById('mt-drive');if(_mdn)_mdn.value='';
+  document.getElementById('mt-notes').value='';var _mdn=document.getElementById('mt-drive');if(_mdn)_mdn.value='';var _mtt=document.getElementById('mt-time');if(_mtt)_mtt.value='';
   document.getElementById('mt-dstart').value='';
   document.getElementById('mt-dend').value='';
   document.getElementById('mt-prio').value='normal';
@@ -3970,7 +4032,7 @@ function openEditTask(id){
   document.getElementById('mt-tplId').value=t.templateId||'';
   document.getElementById('mt-tplsearch').value='';
   const ddE=document.getElementById('tplDropdown');if(ddE)ddE.style.display='none';
-  document.getElementById('mt-notes').value=t.notes||'';var _mde=document.getElementById('mt-drive');if(_mde)_mde.value=t.driveUrl||'';
+  document.getElementById('mt-notes').value=t.notes||'';var _mde=document.getElementById('mt-drive');if(_mde)_mde.value=t.driveUrl||'';var _mte=document.getElementById('mt-time');if(_mte)_mte.value=t.planTime||'';
   document.getElementById('mt-dstart').value=t.dateStart||'';
   document.getElementById('mt-dend').value=t.dateEnd||'';
   document.getElementById('mt-prio').value=t.priority||'normal';
@@ -4259,10 +4321,10 @@ function saveTask(){
   const assignees=getSelectedUsers();
   if(editId){
     const t=S.tasks.find(x=>x.id===editId);
-    if(t){Object.assign(t,{name,project:document.getElementById('mt-proj').value,priority:document.getElementById('mt-prio').value,pole,assignees:Array.isArray(assignees)?assignees:[],estimate:parseInt(document.getElementById('mt-est').value)||0,quantity:parseFloat(document.getElementById('mt-qty').value)||0,unit:document.getElementById('mt-unit').value||'',templateId:document.getElementById('mt-tplId').value||t.templateId||'',notes:document.getElementById('mt-notes').value.trim(),dateStart:document.getElementById('mt-dstart').value,dateEnd:document.getElementById('mt-dend').value,driveUrl:document.getElementById('mt-drive').value.trim()});}
+    if(t){Object.assign(t,{name,project:document.getElementById('mt-proj').value,priority:document.getElementById('mt-prio').value,pole,assignees:Array.isArray(assignees)?assignees:[],estimate:parseInt(document.getElementById('mt-est').value)||0,quantity:parseFloat(document.getElementById('mt-qty').value)||0,unit:document.getElementById('mt-unit').value||'',templateId:document.getElementById('mt-tplId').value||t.templateId||'',notes:document.getElementById('mt-notes').value.trim(),dateStart:document.getElementById('mt-dstart').value,dateEnd:document.getElementById('mt-dend').value,driveUrl:document.getElementById('mt-drive').value.trim(),planTime:(document.getElementById('mt-time')||{}).value||''});if(t.dateStart)replanDay(t.dateStart);}
     toast('✓ Tâche mise à jour','s');
   }else{
-    const newTask={id:'t'+Date.now(),name,project:document.getElementById('mt-proj').value,priority:document.getElementById('mt-prio').value,pole,assignees,estimate:parseInt(document.getElementById('mt-est').value)||0,quantity:parseFloat(document.getElementById('mt-qty').value)||0,unit:document.getElementById('mt-unit').value||'',templateId:document.getElementById('mt-tplId').value||'',notes:document.getElementById('mt-notes').value.trim(),dateStart:document.getElementById('mt-dstart').value,dateEnd:document.getElementById('mt-dend').value,driveUrl:document.getElementById('mt-drive').value.trim(),elapsed:0,timerRunning:false,done:false,archived:false,deleted:false,status:'todo',createdAt:Date.now(),createdBy:CU?CU.id:''};
+    const newTask={id:'t'+Date.now(),name,project:document.getElementById('mt-proj').value,priority:document.getElementById('mt-prio').value,pole,assignees,estimate:parseInt(document.getElementById('mt-est').value)||0,quantity:parseFloat(document.getElementById('mt-qty').value)||0,unit:document.getElementById('mt-unit').value||'',templateId:document.getElementById('mt-tplId').value||'',notes:document.getElementById('mt-notes').value.trim(),dateStart:document.getElementById('mt-dstart').value,dateEnd:document.getElementById('mt-dend').value,driveUrl:document.getElementById('mt-drive').value.trim(),planTime:(document.getElementById('mt-time')||{}).value||'',elapsed:0,timerRunning:false,done:false,archived:false,deleted:false,status:'todo',createdAt:Date.now(),createdBy:CU?CU.id:''};
     S.tasks.push(newTask);
     if(assignees.length)addNotif('Nouvelle tâche','Vous avez été assigné à "'+name+'"','i');
     toast('✓ Tâche "'+name+'" créée — assignée à '+assignees.length+' pers.','s');
@@ -5043,7 +5105,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.71';
+const APP_VERSION = '5.72';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
