@@ -5043,7 +5043,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.70';
+const APP_VERSION = '5.71';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
@@ -5165,7 +5165,8 @@ function openWidget(id){
     setAppBrand('Tâches');
     showScreen('app');
     if(typeof applySidebarState==='function') applySidebarState();
-    var pg=(S.cur && S.cur!=='admin'&&S.cur!=='stats')?S.cur:'dashboard';
+    var _notTask=['admin','stats','clients','notes','planning'];
+    var pg=(S.cur && _notTask.indexOf(S.cur)<0)?S.cur:'dashboard';
     if(typeof goPage==='function') goPage(pg);
   }
 }
