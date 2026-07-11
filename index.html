@@ -1297,14 +1297,15 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     <div class="fg"><label class="fl">Assigner à</label><div class="user-sel-grid" id="userPicker"></div></div>
     <div id="mt-perm-note" style="display:none;background:var(--sf2);border:1px solid var(--bd);border-radius:6px;padding:7px 11px;font-size:11px;color:var(--tx3);margin-bottom:10px;">🔒 Le temps estimé et la quantité sont définis par l'administration.</div>
     <div class="fr">
-      <div class="fg"><label class="fl">Estimation (min)</label><input type="number" class="fi" id="mt-est" placeholder="Ex: 90" min="0"/></div>
+      <div class="fg"><label class="fl">Estimation (min)</label><input type="number" class="fi" id="mt-est" placeholder="Ex: 90" min="0" oninput="suggestSlot()"/></div>
       <div class="fg"><label class="fl">Quantité <span style="color:var(--tx4);font-weight:400;">(pour rendements)</span></label><div style="display:flex;gap:5px;"><input type="number" class="fi" id="mt-qty" placeholder="Ex: 15" min="0" step="any" style="flex:1;min-width:0;"/><select class="fs" id="mt-unit" style="width:80px;flex-shrink:0;"><option value="">—</option><option value="ml">ml</option><option value="m2">m²</option><option value="u">unité</option><option value="h">heure</option></select></div></div>
     </div>
     <div class="fr">
-      <div class="fg"><label class="fl">Date début</label><input type="date" class="fi" id="mt-dstart"/></div>
-      <div class="fg"><label class="fl">Heure</label><input type="time" class="fi" id="mt-time" step="900"/></div>
+      <div class="fg"><label class="fl">Date début</label><input type="date" class="fi" id="mt-dstart" onchange="markSlotTouched()"/></div>
+      <div class="fg"><label class="fl">Heure</label><input type="time" class="fi" id="mt-time" step="900" onchange="markSlotTouched()"/></div>
       <div class="fg"><label class="fl">Date fin</label><input type="date" class="fi" id="mt-dend"/></div>
     </div>
+    <div id="mt-slot-hint" style="display:none;font-size:11px;color:var(--brand);background:var(--brand-xs);padding:6px 10px;border-radius:6px;margin:-4px 0 10px;"></div>
     <div class="fg"><label class="fl">Notes</label><textarea class="fta" id="mt-notes" placeholder="Informations complémentaires..."></textarea></div>
     <div class="fg"><label class="fl">🔗 Lien Google Drive</label><input type="url" class="fi" id="mt-drive" placeholder="https://drive.google.com/..."/></div>
     <div class="ma">
@@ -3195,6 +3196,60 @@ function scheduleTaskAt(taskId, dayKey, minutes){
   save(); if(!PRIVATE_MODE&&typeof syncNow==='function') syncNow();
 }
 
+function isWorkday(d){ var w=d.getDay(); return w>=1 && w<=5; }
+function dayFreeFrom(dayKey, userIds){
+  var end=PLAN_H1*60;
+  var tasks=S.tasks.filter(function(t){
+    if(t.archived||t.deleted||t.done||t.dateStart!==dayKey) return false;
+    if(!userIds||!userIds.length) return true;
+    return t.assignees && t.assignees.some(function(a){return userIds.indexOf(a)>=0;});
+  });
+  var cur=dayStartMin();
+  tasks.forEach(function(t){
+    var st=rmTimeToMin(t.planTime); if(st==null)st=cur;
+    var fin=st+taskDur(t);
+    if(fin>cur) cur=fin;
+  });
+  if(cur<dayStartMin()) cur=dayStartMin();
+  return cur>=end?null:cur;
+}
+function findNextSlot(durMin, userIds){
+  var dur=(durMin&&durMin>0)?durMin:PLAN_DEFAULT_DUR;
+  var end=PLAN_H1*60;
+  var d=new Date(); d.setHours(0,0,0,0);
+  for(var i=0;i<180;i++){
+    var day=new Date(d); day.setDate(d.getDate()+i);
+    if(!isWorkday(day)) continue;
+    var key=rmDateKey(day);
+    var start=dayFreeFrom(key,userIds);
+    if(start==null) continue;
+    start=skipLunch(start,dur);
+    if(start+dur<=end) return {date:key, time:rmMinToTime(start)};
+    if(start<end) return {date:key, time:rmMinToTime(start)};
+  }
+  return null;
+}
+function suggestSlot(force){
+  var dEl=document.getElementById('mt-dstart'), tEl=document.getElementById('mt-time');
+  if(!dEl||!tEl) return;
+  var editing=(document.getElementById('editTaskId')||{}).value;
+  if(editing) return;
+  if(!force && dEl.dataset && dEl.dataset.touched==='1') return;
+  var est=parseInt((document.getElementById('mt-est')||{}).value,10)||0;
+  var users=(typeof getSelectedUsers==='function')?getSelectedUsers():[];
+  var slot=findNextSlot(est,users);
+  if(!slot) return;
+  dEl.value=slot.date; tEl.value=slot.time;
+  var hint=document.getElementById('mt-slot-hint');
+  if(hint){
+    var d=new Date(slot.date+'T00:00');
+    var jours=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+    hint.textContent='💡 Prochain créneau libre : '+jours[d.getDay()]+' '+d.getDate()+'/'+(d.getMonth()+1)+' à '+slot.time;
+    hint.style.display='block';
+  }
+}
+function markSlotTouched(){ var d=document.getElementById('mt-dstart'); if(d&&d.dataset) d.dataset.touched='1'; var h=document.getElementById('mt-slot-hint'); if(h)h.style.display='none'; }
+
 function renderMyTasks(){
   if(!CU)return;
   var el=document.getElementById('myTasksList'); if(!el)return;
@@ -4012,6 +4067,9 @@ function openNewTask(){
     }
   }
   applyTaskFieldPerms();
+  var _sd=document.getElementById('mt-dstart'); if(_sd&&_sd.dataset)_sd.dataset.touched='';
+  var _sh=document.getElementById('mt-slot-hint'); if(_sh)_sh.style.display='none';
+  setTimeout(function(){ suggestSlot(true); },30);
   openModal('moTask');
   setTimeout(()=>document.getElementById('mt-n').focus(),80);
 }
@@ -5105,7 +5163,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.72';
+const APP_VERSION = '5.73';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
