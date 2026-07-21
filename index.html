@@ -1040,6 +1040,13 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .pl-tray-n{font-size:12px;font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pl-tray-m{font-size:10px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .mt-col{border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;}
+.pl-tray-list{display:flex;flex-direction:column;gap:3px;padding:6px;max-height:190px;overflow-y:auto;}
+.pl-ti{display:flex;align-items:baseline;gap:8px;background:var(--sf);border:1px solid var(--bd);border-radius:6px;padding:3px 8px;cursor:grab;transition:var(--tr);}
+.pl-ti:hover{border-color:var(--brand);}
+.pl-ti.pl-locked{cursor:default;opacity:.6;}
+.pl-ti-n{font-size:12px;font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;}
+.pl-ti-m{font-size:10px;color:var(--tx3);white-space:nowrap;flex-shrink:0;}
+.pl-part{float:right;font-size:8px;opacity:.85;margin-left:3px;}
 </style>
 </head>
 <body>
@@ -3082,14 +3089,14 @@ function renderPlanTray(){
     var col=u?u.color:'#94A3B8';
     var cli=taskClientName(t);
     var canMove=planCanMove(t);
-    return '<div class="pl-tray-item'+(canMove?'':' pl-locked')+'" '+(canMove?'draggable="true" ondragstart="planDragStart(event,\''+t.id+'\')" ondragend="planDragEnd(event)"':'')+' onclick="openEditTask(\''+t.id+'\')" style="border-left:4px solid '+col+';" title="'+esc(t.name+(cli?' — '+cli:''))+'">'+
-      '<div class="pl-tray-n">'+(t.priority==='urgent'?'🔴 ':'')+esc(t.name)+'</div>'+
-      '<div class="pl-tray-m">'+(cli?esc(cli)+' · ':'')+rmFmtDur(taskDur(t))+(u?' · '+esc(u.initials):'')+'</div>'+
+    return '<div class="pl-ti'+(canMove?'':' pl-locked')+'" '+(canMove?'draggable="true" ondragstart="planDragStart(event,\''+t.id+'\')" ondragend="planDragEnd(event)"':'')+' onclick="openEditTask(\''+t.id+'\')" style="border-left:3px solid '+col+';" title="'+esc(t.name+(cli?' — '+cli:''))+'">'+
+      '<span class="pl-ti-n">'+(t.priority==='urgent'?'🔴 ':'')+esc(t.name)+'</span>'+
+      '<span class="pl-ti-m">'+(cli?esc(cli)+' · ':'')+rmFmtDur(taskDur(t))+(u?' · '+esc(u.initials):'')+'</span>'+
     '</div>';
   }).join('');
   el.innerHTML='<div class="pl-tray" ondragover="planDragOver(event)" ondrop="planTrayDrop(event)">'+
-    '<div class="pl-tray-head">📥 À planifier <span class="rm-count">'+list.length+'</span><span class="pl-tray-hint">glisse-les dans le planning · dépose ici pour retirer une tâche du planning</span></div>'+
-    '<div class="pl-tray-body">'+(items||'<div class="rm-empty" style="padding:10px;">Tout est planifié 🎉</div>')+'</div>'+
+    '<div class="pl-tray-head">📥 À planifier <span class="rm-count">'+list.length+'</span><span class="pl-tray-hint">glisse dans le planning · dépose ici pour retirer</span></div>'+
+    '<div class="pl-tray-list">'+(items||'<div class="rm-empty" style="padding:8px;">Tout est planifié 🎉</div>')+'</div>'+
   '</div>';
 }
 function planTrayDrop(e){
@@ -3149,40 +3156,53 @@ function planWeekHtml(days, weekLabel){
   var nU=Math.max(1,_planUsers.length);
   var narrow=nU>=4?' pl-narrow':(nU>=2?' pl-mid':'');
   days.forEach(function(d){ replanDay(rmDateKey(d)); });
+  var keys=days.map(rmDateKey);
+  var back=new Date(days[0]); back.setDate(back.getDate()-21);
+  var backKey=rmDateKey(back), lastKey=keys[keys.length-1];
+  var byDay={}; keys.forEach(function(k){ byDay[k]=[]; });
+  _planUsers.forEach(function(uid,ui){
+    var u=S.users.find(function(x){return x.id===uid;}); if(!u)return;
+    S.tasks.forEach(function(t){
+      if(t.archived||t.deleted||t.done||!t.dateStart) return;
+      if(t.dateStart<backKey || t.dateStart>lastKey) return;
+      if(!t.assignees || t.assignees.indexOf(uid)<0) return;
+      var st=rmTimeToMin(t.planTime); if(st==null)st=dayStartMin();
+      var segs=taskSpan(t.dateStart, st, taskDur(t), t.forced);
+      segs.forEach(function(sg,si){
+        if(!byDay[sg.day]) return;
+        byDay[sg.day].push({task:t,user:u,lane:ui,start:sg.start,end:sg.end,part:si+1,total:segs.length});
+      });
+    });
+  });
   var axis='<div class="pl-axis"><div class="pl-axis-corner"></div><div class="pl-axis-hours" style="height:'+gridH+'px;">';
   for(var h=PLAN_H0;h<PLAN_H1;h++){ axis+='<div class="pl-hour" style="height:'+PLAN_PXH+'px;">'+h+'h</div>'; }
   axis+='</div></div>';
   var cols='';
   days.forEach(function(d,di){
-    var key=rmDateKey(d);
+    var key=keys[di];
     var isToday=key===todayKey;
     var weekend=!isWorkday(d);
-    var blocksHtml='';
-    _planUsers.forEach(function(uid,ui){
-      var u=S.users.find(function(x){return x.id===uid;}); if(!u)return;
-      var ut=S.tasks.filter(function(t){return !t.archived&&!t.deleted&&!t.done&&t.dateStart===key&&t.assignees&&t.assignees.indexOf(uid)>=0;});
-      ut.forEach(function(t){
-        var st=rmTimeToMin(t.planTime); if(st==null)st=dayStartMin();
-        var dur=taskDur(t);
-        var segs=planSegments(st,dur);
-        var fin=segs[segs.length-1][1];
-        var canMove=planCanMove(t);
-        var cli=taskClientName(t);
-        var tip=t.name+(cli?' — '+cli:'')+' · '+u.name+' ('+rmMinToTime(st)+'-'+rmMinToTime(fin)+(segs.length>1?', pause 13h-14h':'')+')';
-        var w=100/nU;
-        segs.forEach(function(sg,si){
-          var top=Math.max(0,planMinToY(sg[0]));
-          var hh=Math.max(14,(sg[1]-sg[0])*(PLAN_PXH/60));
-          blocksHtml+='<div class="pl-block'+(canMove?'':' pl-locked')+(si>0?' pl-seg2':'')+(t.pinned?' pl-pinned':'')+'" style="top:'+top+'px;height:'+hh+'px;left:calc('+(ui*w)+'% + 1px);width:calc('+w+'% - 3px);background:'+u.color+';" '+
-            (canMove?'draggable="true" ondragstart="planDragStart(event,\''+t.id+'\')" ondragend="planDragEnd(event)"':'')+
-            ' onclick="event.stopPropagation();openEditTask(\''+t.id+'\')" title="'+esc(tip)+'">'+
-            (si===0?'<div class="pl-block-t">'+rmMinToTime(sg[0])+(t.forced?'<span class="pl-pin" title="Horaire force">⏰</span>':'')+(t.pinned?'<span class="pl-pin" onclick="event.stopPropagation();togglePin(\''+t.id+'\')" title="Heure fixe — cliquer pour liberer">📌</span>':'')+'</div>':'<div class="pl-block-t">suite</div>')+
-            '<div class="pl-block-n">'+esc(t.name)+'</div>'+
-            (cli?'<div class="pl-block-c">'+esc(cli)+'</div>':'')+
-          '</div>';
-        });
-      });
-    });
+    var w=100/nU;
+    var blocksHtml=(byDay[key]||[]).map(function(bk){
+      var t=bk.task, u=bk.user;
+      var top=Math.max(0,planMinToY(bk.start));
+      var hh=Math.max(14,(bk.end-bk.start)*(PLAN_PXH/60));
+      var canMove=planCanMove(t);
+      var cli=taskClientName(t);
+      var multi=bk.total>1;
+      var tip=t.name+(cli?' — '+cli:'')+' · '+u.name+' ('+rmMinToTime(bk.start)+'-'+rmMinToTime(bk.end)+(multi?', partie '+bk.part+'/'+bk.total+' — total '+rmFmtDur(taskDur(t)):'')+')';
+      return '<div class="pl-block'+(canMove?'':' pl-locked')+(bk.part>1?' pl-seg2':'')+(t.pinned?' pl-pinned':'')+'" style="top:'+top+'px;height:'+hh+'px;left:calc('+(bk.lane*w)+'% + 1px);width:calc('+w+'% - 3px);background:'+u.color+';" '+
+        (canMove?'draggable="true" ondragstart="planDragStart(event,\''+t.id+'\')" ondragend="planDragEnd(event)"':'')+
+        ' onclick="event.stopPropagation();openEditTask(\''+t.id+'\')" title="'+esc(tip)+'">'+
+        '<div class="pl-block-t">'+rmMinToTime(bk.start)+
+          (multi?'<span class="pl-part">'+bk.part+'/'+bk.total+'</span>':'')+
+          (t.forced?'<span class="pl-pin" title="Horaire forcé">⏰</span>':'')+
+          (t.pinned?'<span class="pl-pin" onclick="event.stopPropagation();togglePin(\''+t.id+'\')" title="Heure fixe — cliquer pour libérer">📌</span>':'')+
+        '</div>'+
+        '<div class="pl-block-n">'+esc(t.name)+'</div>'+
+        (cli?'<div class="pl-block-c">'+esc(cli)+'</div>':'')+
+      '</div>';
+    }).join('');
     var lunchTop=planMinToY(PLAN_LUNCH_S), lunchH=(PLAN_LUNCH_E-PLAN_LUNCH_S)*(PLAN_PXH/60);
     var offTop=planMinToY(dayStartMin());
     var offBot=planMinToY(PLAN_WORK_END);
@@ -3283,11 +3303,33 @@ function togglePin(id){
   if(typeof toast==='function') toast(t.pinned?'📌 Heure fixée':'Heure libérée','s');
   renderPlanning();
 }
-function replanUserDay(dayKey, uid){
+function taskSpan(dayKey, startMin, dur, forced){
+  var dayEnd=forced?PLAN_H1*60:PLAN_WORK_END;
+  var segs=[], day=dayKey, cur=startMin, left=dur, guard=0;
+  while(left>0 && guard++<40){
+    var s=alignStart(cur);
+    if(s>=dayEnd){ if(forced) break; day=nextWorkday(day); cur=dayStartMin(); continue; }
+    var stop=(s<PLAN_LUNCH_S)?PLAN_LUNCH_S:dayEnd;
+    if(stop>dayEnd) stop=dayEnd;
+    var cap=stop-s;
+    if(cap<=0){ cur=PLAN_LUNCH_E; continue; }
+    var used=Math.min(cap,left);
+    segs.push({day:day,start:s,end:s+used});
+    left-=used; cur=s+used;
+    if(left>0){
+      if(cur>=dayEnd){ if(forced) break; day=nextWorkday(day); cur=dayStartMin(); }
+      else if(cur>=PLAN_LUNCH_S && cur<PLAN_LUNCH_E){ cur=PLAN_LUNCH_E; }
+    }
+  }
+  return segs;
+}
+function spanLast(segs){ return segs.length?segs[segs.length-1]:null; }
+function replanUserDay(dayKey, uid, startFrom){
+  var out={overflow:[], spill:{}};
   var tasks=S.tasks.filter(function(t){
     return !t.archived&&!t.deleted&&!t.done&&t.dateStart===dayKey&&taskOwner(t)===uid;
   });
-  if(!tasks.length) return [];
+  if(!tasks.length) return out;
   var srt=function(a,b){
     var am=rmTimeToMin(a.planTime), bm=rmTimeToMin(b.planTime);
     if(am==null)am=99999; if(bm==null)bm=99999;
@@ -3297,38 +3339,58 @@ function replanUserDay(dayKey, uid){
   var pinned=tasks.filter(function(t){return !!t.pinned;}).sort(srt);
   var flex=tasks.filter(function(t){return !t.pinned;}).sort(srt);
   var busy=[];
+  var noteSpill=function(segs){
+    segs.forEach(function(sg){ if(sg.day!==dayKey) out.spill[sg.day]=Math.max(out.spill[sg.day]||0, sg.end); });
+  };
   pinned.forEach(function(t){
     var st=rmTimeToMin(t.planTime);
     if(st==null){ st=alignStart(dayStartMin()); t.planTime=rmMinToTime(st); t._upd=Date.now(); }
-    busy.push([st, planEnd(st,taskDur(t))]);
+    var segs=taskSpan(dayKey, st, taskDur(t), t.forced);
+    segs.forEach(function(sg){ if(sg.day===dayKey) busy.push([sg.start,sg.end]); });
+    noteSpill(segs);
   });
   busy.sort(function(a,b){return a[0]-b[0];});
   var setT=function(t,st){ var nt=rmMinToTime(st); if(t.planTime!==nt){ t.planTime=nt; t._upd=Date.now(); } };
-  var cur=dayStartMin(), overflow=[];
+  var cur=Math.max(dayStartMin(), startFrom||0);
   flex.forEach(function(t){
     var dur=taskDur(t);
-    var st=fitStart(dur,busy,cur);
-    if(st==null){
-      var minS=alignStart(dayStartMin());
-      if(planEnd(minS,dur)>PLAN_WORK_END && !busy.length && cur<=dayStartMin()){
-        setT(t,minS); busy.push([minS,planEnd(minS,dur)]); cur=planEnd(minS,dur); return;
-      }
-      overflow.push(t); return;
+    var st=fitStart(dur, busy, cur);
+    if(st!=null){
+      setT(t,st);
+      var segs=taskSpan(dayKey, st, dur, false);
+      segs.forEach(function(sg){ if(sg.day===dayKey) busy.push([sg.start,sg.end]); });
+      busy.sort(function(a,b){return a[0]-b[0];});
+      var last=spanLast(segs);
+      cur=(last&&last.day===dayKey)?last.end:PLAN_WORK_END;
+      noteSpill(segs);
+      return;
     }
-    setT(t,st);
-    var en=planEnd(st,dur);
-    busy.push([st,en]); busy.sort(function(a,b){return a[0]-b[0];});
-    cur=en;
+    // ne rentre pas entierement : on l'etale sur les jours suivants si rien n'est epingle apres
+    var s=alignStart(Math.max(cur,dayStartMin()));
+    var bloque=busy.some(function(iv){ return iv[1]>s; });
+    if(!bloque && s<PLAN_WORK_END){
+      setT(t,s);
+      var sp=taskSpan(dayKey, s, dur, false);
+      sp.forEach(function(sg){ if(sg.day===dayKey) busy.push([sg.start,sg.end]); });
+      busy.sort(function(a,b){return a[0]-b[0];});
+      cur=PLAN_WORK_END;
+      noteSpill(sp);
+      return;
+    }
+    out.overflow.push(t);
   });
-  return overflow;
+  return out;
 }
 function replanUserChain(dayKey, uid){
-  var day=dayKey, guard=0;
-  while(day && guard++<40){
-    var over=replanUserDay(day,uid);
-    if(!over.length) break;
+  var spill={}, day=dayKey, guard=0;
+  while(day && guard++<60){
+    var res=replanUserDay(day, uid, spill[day]||0);
+    Object.keys(res.spill).forEach(function(k){ spill[k]=Math.max(spill[k]||0, res.spill[k]); });
     var nd=nextWorkday(day);
-    over.forEach(function(t){ t.dateStart=nd; t.planTime=''; t._planSeq=2; t._upd=Date.now(); });
+    if(res.overflow.length){
+      res.overflow.forEach(function(t){ t.dateStart=nd; t.planTime=''; t._planSeq=2; t._upd=Date.now(); });
+    }
+    if(!res.overflow.length && !(spill[nd]||0)) break;
     day=nd;
   }
 }
@@ -3366,25 +3428,13 @@ function scheduleTaskAt(taskId, dayKey, minutes){
     save(); if(!PRIVATE_MODE&&typeof syncNow==='function') syncNow();
     return;
   }
-  var dur=taskDur(t);
   var m=Math.round(minutes/15)*15;
   var minOk=t.forced?PLAN_H0*60:dayStartMin();
   if(m<minOk)m=minOk;
   m=alignStart(m);
-  var tropLongue=planEnd(alignStart(dayStartMin()),dur)>PLAN_WORK_END;
-  var depasse=planEnd(m,dur)>PLAN_WORK_END;
-  if(depasse && !t.forced && !tropLongue){
-    var forcer=(typeof confirm==='function') && confirm('Cette tâche dépasse la fin de journée (18h).\n\nOK = forcer cet horaire (travail en soirée)\nAnnuler = reporter au jour suivant');
-    if(forcer){ t.forced=true; }
-    else {
-      var nd=nextWorkday(dayKey);
-      t.dateStart=nd; t.planTime=''; t.pinned=false; t._planSeq=0; t._upd=Date.now();
-      if(typeof toast==='function') toast('Reportée au '+nd.slice(8)+'/'+nd.slice(5,7),'i');
-      replanDay(nd, owner);
-      if(oldDay && oldDay!==nd) replanDay(oldDay, owner);
-      save(); if(!PRIVATE_MODE&&typeof syncNow==='function') syncNow();
-      return;
-    }
+  if(m>=PLAN_WORK_END && !t.forced){
+    var forcer=(typeof confirm==='function') && confirm('Cette tâche démarre après 18h.\n\nOK = forcer cet horaire (travail en soirée)\nAnnuler = la placer dans les horaires normaux');
+    if(forcer) t.forced=true; else m=alignStart(dayStartMin());
   }
   t.dateStart=dayKey; t.planTime=rmMinToTime(m); t.pinned=true; t._planSeq=0; t._upd=Date.now();
   replanDay(dayKey, owner);
@@ -4652,7 +4702,7 @@ function mergeClientsFromSheet(arr){
     var lc=S.clients.find(function(x){return x.id===sc.id;});
     if(lc){
       if((sc._upd||0) > (lc._upd||0)){
-        lc.name=sc.name; lc.phone=sc.phone; lc.email=sc.email; lc.address=sc.address; lc.cp=sc.cp; lc.ville=sc.ville; lc.notes=sc.notes; lc.contacts=sc.contacts; lc.type=sc.type; lc.status=sc.status; lc.source=sc.source; lc._upd=sc._upd||0; lc._deleted=sc._deleted||false;
+        lc.name=sc.name; lc.phone=sc.phone; lc.email=sc.email; lc.address=sc.address; lc.cp=sc.cp; lc.ville=sc.ville; lc.driveUrl=sc.driveUrl; lc.notes=sc.notes; lc.contacts=sc.contacts; lc.type=sc.type; lc.status=sc.status; lc.source=sc.source; lc._upd=sc._upd||0; lc._deleted=sc._deleted||false;
       }
     } else { S.clients.push(sc); }
   });
@@ -4709,6 +4759,7 @@ function ensureClientModal(){
       '<div class="fg"><label class="fl">Email</label><input type="text" class="fi" id="cli-email" placeholder="client@email.fr"/></div>'+
     '</div>'+
     '<div class="fg"><label class="fl">Adresse</label><input type="text" class="fi" id="cli-address" placeholder="12 rue des Chênes"/></div>'+
+    '<div class="fg"><label class="fl">🔗 Dossier Google Drive</label><input type="url" class="fi" id="cli-drive" placeholder="https://drive.google.com/..."/></div>'+
     '<div class="fr"><div class="fg"><label class="fl">Code postal</label><input type="text" class="fi" id="cli-cp" placeholder="35000" inputmode="numeric"/></div><div class="fg"><label class="fl">Ville</label><input type="text" class="fi" id="cli-ville" placeholder="Rennes"/></div></div>'+
     '<div class="fg"><label class="fl">Interlocuteurs</label><div id="cli-contacts"></div><button type="button" class="btn sm" style="margin-top:4px;" onclick="addContactRow()">+ Ajouter un interlocuteur</button></div>'+
     '<div class="fg"><label class="fl">Notes</label><textarea class="fi" id="cli-notes" rows="2" placeholder="Infos utiles, préférences, historique..."></textarea></div>'+
@@ -4723,7 +4774,7 @@ function ensureClientModal(){
 function openNewClient(){
   ensureClientModal();
   document.getElementById('editClientId').value='';
-  ['cli-name','cli-phone','cli-email','cli-address','cli-notes','cli-type','cli-status','cli-source','cli-cp','cli-ville'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+  ['cli-name','cli-phone','cli-email','cli-address','cli-notes','cli-type','cli-status','cli-source','cli-cp','cli-ville','cli-drive'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
   renderContactRows([]);
   document.getElementById('cliModalTitle').textContent='Nouveau client';
   document.getElementById('cliDelBtn').style.display='none';
@@ -4740,6 +4791,7 @@ function editClient(id){
   document.getElementById('cli-address').value=c.address||'';
   document.getElementById('cli-cp').value=c.cp||'';
   document.getElementById('cli-ville').value=c.ville||'';
+  document.getElementById('cli-drive').value=c.driveUrl||'';
   document.getElementById('cli-notes').value=c.notes||'';
   document.getElementById('cli-type').value=c.type||'';
   document.getElementById('cli-status').value=c.status||'';
@@ -4753,7 +4805,7 @@ function saveClient(){
   var name=document.getElementById('cli-name').value.trim();
   if(!name){ toast('Entrez un nom','e'); return; }
   var id=document.getElementById('editClientId').value;
-  var data={name:name, phone:document.getElementById('cli-phone').value.trim(), email:document.getElementById('cli-email').value.trim(), address:document.getElementById('cli-address').value.trim(), cp:document.getElementById('cli-cp').value.trim(), ville:document.getElementById('cli-ville').value.trim(), notes:document.getElementById('cli-notes').value.trim(), type:document.getElementById('cli-type').value, status:document.getElementById('cli-status').value, source:document.getElementById('cli-source').value, contacts:collectContacts(), _upd:Date.now(), _deleted:false};
+  var data={name:name, phone:document.getElementById('cli-phone').value.trim(), email:document.getElementById('cli-email').value.trim(), address:document.getElementById('cli-address').value.trim(), cp:document.getElementById('cli-cp').value.trim(), ville:document.getElementById('cli-ville').value.trim(), driveUrl:document.getElementById('cli-drive').value.trim(), notes:document.getElementById('cli-notes').value.trim(), type:document.getElementById('cli-type').value, status:document.getElementById('cli-status').value, source:document.getElementById('cli-source').value, contacts:collectContacts(), _upd:Date.now(), _deleted:false};
   if(!S.clients) S.clients=[];
   if(id){
     var c=S.clients.find(function(x){return x.id===id;});
@@ -4996,6 +5048,7 @@ function renderClientDetail(c){
   if(c.phone) contact+='<div class="cd-row">📞 <a href="tel:'+esc(c.phone)+'" style="color:var(--brand);text-decoration:none;">'+esc(c.phone)+'</a></div>';
   if(c.email) contact+='<div class="cd-row">✉ <a href="'+mailLink(c.email)+'" target="_blank" style="color:var(--brand);text-decoration:none;">'+esc(c.email)+'</a></div>';
   var _adr=[c.address,[c.cp,c.ville].filter(Boolean).join(' ')].filter(Boolean).join(', '); if(_adr) contact+='<div class="cd-row">📍 '+esc(_adr)+'</div>';
+  if(c.driveUrl) contact+='<div class="cd-row"><a href="'+esc(c.driveUrl)+'" target="_blank" style="color:var(--brand);text-decoration:none;font-weight:600;">📁 Ouvrir le dossier Drive</a></div>';
   if(c.notes) contact+='<div class="cd-row" style="opacity:.85;white-space:pre-wrap;">📝 '+esc(c.notes)+'</div>';
   h+='<div class="cd-section">'+(contact||'<div class="cd-empty">Aucune coordonnée renseignée</div>')+'</div>';
   h+='<div class="cd-section"><div class="cd-title">Projets & dossiers ('+(projs.length+folders.length)+')</div>';
@@ -5350,7 +5403,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.78';
+const APP_VERSION = '5.79';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
