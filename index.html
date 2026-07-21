@@ -1005,6 +1005,24 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .plm-chip{font-size:9px;color:#fff;padding:1px 5px;border-radius:4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;font-weight:600;}
 .plm-more{font-size:9px;color:var(--tx3);padding-left:3px;}
 @media(max-width:700px){.plm-cell{min-height:54px;}.plm-chip{font-size:8px;padding:1px 3px;}}
+
+/* -- PLANNING v2 : 2 semaines, colonnes par personne -- */
+.pl-weekwrap{margin-bottom:18px;}
+.pl-weeklab{font-size:12px;font-weight:700;color:var(--tx3);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px;}
+.pl-hour{font-size:9px;line-height:1;padding-top:1px;}
+.pl-day.pl-weekend .pl-day-head{opacity:.55;}
+.pl-off{position:absolute;left:0;right:0;background:var(--sf2);opacity:.55;pointer-events:none;}
+.pl-lunch{background:repeating-linear-gradient(45deg,var(--sf2),var(--sf2) 4px,transparent 4px,transparent 9px);}
+.pl-block{padding:1px 4px;line-height:1.1;}
+.pl-block-c{font-size:9px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-style:italic;}
+.pl-mid .pl-block-t{font-size:8px;}
+.pl-mid .pl-block-n{font-size:9px;}
+.pl-mid .pl-block-c{font-size:8px;}
+.pl-narrow .pl-block{padding:1px 2px;}
+.pl-narrow .pl-block-t{font-size:7px;}
+.pl-narrow .pl-block-n{font-size:8px;}
+.pl-narrow .pl-block-c{display:none;}
+@media(max-width:700px){.pl-day{min-width:74px;}}
 </style>
 </head>
 <body>
@@ -2992,7 +3010,7 @@ function mtTaskRow(t){
   '</div>';
 }
 var _planUsers=null, _planWeekOffset=0, _planDragId=null;
-var PLAN_H0=9, PLAN_H1=18, PLAN_LUNCH_S=780, PLAN_LUNCH_E=840, PLAN_PXH=48;
+var PLAN_H0=6, PLAN_H1=24, PLAN_LUNCH_S=780, PLAN_LUNCH_E=840, PLAN_PXH=26, PLAN_WORK_END=1080;
 
 function planInitUsers(){ if(_planUsers===null) _planUsers=CU?[CU.id]:[]; }
 function planActiveUsers(){ return S.users.filter(function(u){return u.role!=='disabled';}); }
@@ -3066,17 +3084,13 @@ function renderPlanMonth(){
 function planAddOnDay(key){ openNewTask(); setTimeout(function(){ var e=document.getElementById('mt-dstart'); if(e)e.value=key; },60); }
 function planMonthNav(dir){ if(dir===0)_planMonthOffset=0; else _planMonthOffset+=dir; renderPlanning(); }
 function planSetView(v){ _planView=v; renderPlanning(); }
-function renderPlanWeek(){
-  if(!CU)return;
-  planInitUsers();
-  var el=document.getElementById('planningBody'); if(!el)return;
-  var dayStartMin=rmTimeToMin(S.dayStart||'09:00'); if(dayStartMin==null)dayStartMin=540;
-  renderPlanControls();
-  var days=rmWeekDays(_planWeekOffset);
-  days.forEach(function(d){ replanDay(rmDateKey(d)); });
+function planWeekHtml(days, weekLabel){
   var todayKey=rmDateKey(new Date());
   var dayNames=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
   var gridH=(PLAN_H1-PLAN_H0)*PLAN_PXH;
+  var nU=Math.max(1,_planUsers.length);
+  var narrow=nU>=4?' pl-narrow':(nU>=2?' pl-mid':'');
+  days.forEach(function(d){ replanDay(rmDateKey(d)); });
   var axis='<div class="pl-axis"><div class="pl-axis-corner"></div><div class="pl-axis-hours" style="height:'+gridH+'px;">';
   for(var h=PLAN_H0;h<PLAN_H1;h++){ axis+='<div class="pl-hour" style="height:'+PLAN_PXH+'px;">'+h+'h</div>'; }
   axis+='</div></div>';
@@ -3084,35 +3098,59 @@ function renderPlanWeek(){
   days.forEach(function(d,di){
     var key=rmDateKey(d);
     var isToday=key===todayKey;
-    var dayBlocks=[];
-    _planUsers.forEach(function(uid){
+    var weekend=!isWorkday(d);
+    var blocksHtml='';
+    _planUsers.forEach(function(uid,ui){
       var u=S.users.find(function(x){return x.id===uid;}); if(!u)return;
       var ut=S.tasks.filter(function(t){return !t.archived&&!t.deleted&&!t.done&&t.dateStart===key&&t.assignees&&t.assignees.indexOf(uid)>=0;});
-      ut.forEach(function(t){ var st=rmTimeToMin(t.planTime); if(st==null)st=dayStartMin(); dayBlocks.push({task:t,start:st,end:st+taskDur(t),color:u.color,uname:u.name}); });
+      ut.forEach(function(t){
+        var st=rmTimeToMin(t.planTime); if(st==null)st=dayStartMin();
+        var en=planEnd(st,taskDur(t));
+        var top=Math.max(0,planMinToY(st));
+        var hh=Math.max(16,(en-st)*(PLAN_PXH/60));
+        var w=100/nU;
+        var canMove=planCanMove(t);
+        var cli=taskClientName(t);
+        var tip=t.name+(cli?' — '+cli:'')+' · '+u.name+' ('+rmMinToTime(st)+'-'+rmMinToTime(en)+')';
+        blocksHtml+='<div class="pl-block'+(canMove?'':' pl-locked')+'" style="top:'+top+'px;height:'+hh+'px;left:calc('+(ui*w)+'% + 1px);width:calc('+w+'% - 3px);background:'+u.color+';" '+
+          (canMove?'draggable="true" ondragstart="planDragStart(event,\''+t.id+'\')" ondragend="planDragEnd(event)"':'')+
+          ' onclick="event.stopPropagation();openEditTask(\''+t.id+'\')" title="'+esc(tip)+'">'+
+          '<div class="pl-block-t">'+rmMinToTime(st)+'</div>'+
+          '<div class="pl-block-n">'+esc(t.name)+'</div>'+
+          (cli?'<div class="pl-block-c">'+esc(cli)+'</div>':'')+
+        '</div>';
+      });
     });
-    planAssignLanes(dayBlocks);
-    var maxLane=b_maxlane||1;
-    var blocksHtml=dayBlocks.map(function(b){
-      var top=Math.max(0,planMinToY(b.start));
-      var hh=Math.max(22,(b.end-b.start)*(PLAN_PXH/60));
-      var w=100/maxLane;
-      var canMove=planCanMove(b.task);
-      var multi=_planUsers.length>1;
-      return '<div class="pl-block'+(canMove?'':' pl-locked')+'" style="top:'+top+'px;height:'+hh+'px;left:calc('+(b.lane*w)+'% + 1px);width:calc('+w+'% - 3px);background:'+b.color+';" '+(canMove?'draggable="true" ondragstart="planDragStart(event,\''+b.task.id+'\')" ondragend="planDragEnd(event)"':'')+' onclick="event.stopPropagation();openEditTask(\''+b.task.id+'\')" title="'+esc(b.task.name)+(multi?' — '+esc(b.uname):'')+' ('+rmMinToTime(b.start)+'-'+rmMinToTime(b.end)+')">'+
-        '<div class="pl-block-t">'+rmMinToTime(b.start)+'</div><div class="pl-block-n">'+esc(b.task.name)+'</div></div>';
-    }).join('');
     var lunchTop=planMinToY(PLAN_LUNCH_S), lunchH=(PLAN_LUNCH_E-PLAN_LUNCH_S)*(PLAN_PXH/60);
+    var offTop=planMinToY(dayStartMin());
+    var offBot=planMinToY(PLAN_WORK_END);
     var hourLines=''; for(var hl=0;hl<(PLAN_H1-PLAN_H0);hl++){ hourLines+='<div class="pl-hline" style="top:'+(hl*PLAN_PXH)+'px;"></div>'; }
-    cols+='<div class="pl-day'+(isToday?' pl-today':'')+'">'+
+    cols+='<div class="pl-day'+(isToday?' pl-today':'')+(weekend?' pl-weekend':'')+'">'+
       '<div class="pl-day-head">'+dayNames[di]+'<br><span class="pl-daynum">'+d.getDate()+'/'+(d.getMonth()+1)+'</span></div>'+
       '<div class="pl-day-grid" style="height:'+gridH+'px;" ondragover="planDragOver(event)" ondrop="planDrop(event,\''+key+'\')">'+
         hourLines+
-        '<div class="pl-lunch" style="top:'+lunchTop+'px;height:'+lunchH+'px;">Pause</div>'+
+        (offTop>0?'<div class="pl-off" style="top:0;height:'+offTop+'px;"></div>':'')+
+        '<div class="pl-off" style="top:'+offBot+'px;height:'+(gridH-offBot)+'px;"></div>'+
+        '<div class="pl-lunch" style="top:'+lunchTop+'px;height:'+lunchH+'px;"></div>'+
         blocksHtml+
       '</div>'+
     '</div>';
   });
-  el.innerHTML='<div class="pl-grid">'+axis+'<div class="pl-days">'+cols+'</div></div>';
+  return '<div class="pl-weekwrap'+narrow+'"><div class="pl-weeklab">'+esc(weekLabel)+'</div><div class="pl-grid">'+axis+'<div class="pl-days">'+cols+'</div></div></div>';
+}
+function renderPlanWeek(){
+  if(!CU)return;
+  planInitUsers();
+  var el=document.getElementById('planningBody'); if(!el)return;
+  renderPlanControls();
+  var d1=rmWeekDays(_planWeekOffset), d2=rmWeekDays(_planWeekOffset+1);
+  var lab=function(days,off){
+    if(off===0) return 'Cette semaine';
+    if(off===1) return 'Semaine suivante';
+    if(off===-1) return 'Semaine dernière';
+    return 'Semaine du '+days[0].getDate()+'/'+(days[0].getMonth()+1);
+  };
+  el.innerHTML=planWeekHtml(d1,lab(d1,_planWeekOffset))+planWeekHtml(d2,lab(d2,_planWeekOffset+1));
 }
 function planDragStart(e,id){ _planDragId=id; e.dataTransfer.effectAllowed='move'; try{e.dataTransfer.setData('text/plain',id);}catch(x){} }
 function planDragEnd(e){ _planDragId=null; document.querySelectorAll('.pl-day-over').forEach(function(x){x.classList.remove('pl-day-over');}); }
@@ -3139,31 +3177,82 @@ function skipLunch(start,dur){
   if(start>=PLAN_LUNCH_S && start<PLAN_LUNCH_E) return PLAN_LUNCH_E;
   return start;
 }
-function replanDay(dayKey){
-  if(!dayKey) return;
-  var tasks=S.tasks.filter(function(t){return !t.archived&&!t.deleted&&!t.done&&t.dateStart===dayKey;});
-  if(!tasks.length) return;
+function taskOwner(t){ return (t.assignees && t.assignees.length)?t.assignees[0]:''; }
+function taskClientName(t){
+  var p=(S.projects||[]).find(function(x){return x.id===t.project;});
+  if(!p) return '';
+  if(p.clientId){ var c=(S.clients||[]).find(function(x){return x.id===p.clientId;}); if(c) return c.name; }
+  return p.client||'';
+}
+function alignStart(start){ return (start>=PLAN_LUNCH_S && start<PLAN_LUNCH_E)?PLAN_LUNCH_E:start; }
+function planEnd(start,dur){
+  if(start>=PLAN_LUNCH_E || start+dur<=PLAN_LUNCH_S) return start+dur;
+  return start+dur+(PLAN_LUNCH_E-PLAN_LUNCH_S);
+}
+function nextWorkday(dayKey){
+  var d=new Date(dayKey+'T00:00');
+  var guard=0;
+  do { d.setDate(d.getDate()+1); guard++; } while(!isWorkday(d) && guard<10);
+  return rmDateKey(d);
+}
+function ownersOfDay(dayKey){
+  var o={};
+  S.tasks.forEach(function(t){ if(!t.archived&&!t.deleted&&!t.done&&t.dateStart===dayKey) o[taskOwner(t)]=1; });
+  return Object.keys(o);
+}
+function replanUserDay(dayKey, uid){
+  var tasks=S.tasks.filter(function(t){
+    return !t.archived&&!t.deleted&&!t.done&&t.dateStart===dayKey&&taskOwner(t)===uid;
+  });
+  if(!tasks.length) return [];
   tasks.sort(function(a,b){
     var am=rmTimeToMin(a.planTime), bm=rmTimeToMin(b.planTime);
     if(am==null)am=99999; if(bm==null)bm=99999;
     if(am!==bm) return am-bm;
     return (a._planSeq||0)-(b._planSeq||0);
   });
-  var cur=dayStartMin();
+  var cur=dayStartMin(), overflow=[];
   tasks.forEach(function(t){
     var dur=taskDur(t);
     var want=rmTimeToMin(t.planTime);
     var start=(want!=null && want>cur)?want:cur;
-    start=skipLunch(start,dur);
+    start=alignStart(start);
+    var end=planEnd(start,dur);
+    if(end>PLAN_WORK_END){
+      var minStart=alignStart(dayStartMin());
+      var minEnd=planEnd(minStart,dur);
+      if(minEnd>PLAN_WORK_END && cur<=dayStartMin()){
+        var nt0=rmMinToTime(minStart);
+        if(t.planTime!==nt0){ t.planTime=nt0; t._upd=Date.now(); }
+        cur=minEnd; return;
+      }
+      overflow.push(t); return;
+    }
     var nt=rmMinToTime(start);
     if(t.planTime!==nt){ t.planTime=nt; t._upd=Date.now(); }
-    cur=start+dur;
+    cur=end;
   });
+  return overflow;
+}
+function replanUserChain(dayKey, uid){
+  var day=dayKey, guard=0;
+  while(day && guard++<40){
+    var over=replanUserDay(day,uid);
+    if(!over.length) break;
+    var nd=nextWorkday(day);
+    over.forEach(function(t){ t.dateStart=nd; t.planTime=''; t._planSeq=2; t._upd=Date.now(); });
+    day=nd;
+  }
+}
+function replanDay(dayKey, uid){
+  if(!dayKey) return;
+  var uids=(uid===undefined||uid===null)?ownersOfDay(dayKey):[uid];
+  uids.forEach(function(u){ replanUserChain(dayKey,u); });
 }
 function replanAllDays(){
   var days={};
   S.tasks.forEach(function(t){ if(!t.archived&&!t.deleted&&!t.done&&t.dateStart) days[t.dateStart]=1; });
-  Object.keys(days).forEach(replanDay);
+  Object.keys(days).sort().forEach(function(d){ replanDay(d); });
 }
 function taskSortKey(t){
   if(!t.dateStart) return 9e15;
@@ -3181,6 +3270,7 @@ function sortTasksByPlan(arr){
 }
 function scheduleTaskAt(taskId, dayKey, minutes){
   var t=S.tasks.find(function(x){return x.id===taskId;}); if(!t) return;
+  var owner=taskOwner(t);
   var oldDay=t.dateStart;
   t.dateStart=dayKey||'';
   if(dayKey){
@@ -3188,34 +3278,33 @@ function scheduleTaskAt(taskId, dayKey, minutes){
     if(m<dayStartMin())m=dayStartMin();
     t.planTime=rmMinToTime(m);
     t._planSeq=0;
-    S.tasks.forEach(function(x){ if(x!==t && x.dateStart===dayKey) x._planSeq=1; });
+    S.tasks.forEach(function(x){ if(x!==t && x.dateStart===dayKey && taskOwner(x)===owner) x._planSeq=1; });
   } else { t.planTime=''; }
   t._upd=Date.now();
-  if(dayKey) replanDay(dayKey);
-  if(oldDay && oldDay!==dayKey) replanDay(oldDay);
+  if(dayKey) replanDay(dayKey, owner);
+  if(oldDay && oldDay!==dayKey) replanDay(oldDay, owner);
   save(); if(!PRIVATE_MODE&&typeof syncNow==='function') syncNow();
 }
 
 function isWorkday(d){ var w=d.getDay(); return w>=1 && w<=5; }
 function dayFreeFrom(dayKey, userIds){
-  var end=PLAN_H1*60;
   var tasks=S.tasks.filter(function(t){
     if(t.archived||t.deleted||t.done||t.dateStart!==dayKey) return false;
     if(!userIds||!userIds.length) return true;
-    return t.assignees && t.assignees.some(function(a){return userIds.indexOf(a)>=0;});
+    return userIds.indexOf(taskOwner(t))>=0;
   });
   var cur=dayStartMin();
   tasks.forEach(function(t){
     var st=rmTimeToMin(t.planTime); if(st==null)st=cur;
-    var fin=st+taskDur(t);
+    var fin=planEnd(st,taskDur(t));
     if(fin>cur) cur=fin;
   });
   if(cur<dayStartMin()) cur=dayStartMin();
-  return cur>=end?null:cur;
+  return cur>=PLAN_WORK_END?null:cur;
 }
 function findNextSlot(durMin, userIds){
   var dur=(durMin&&durMin>0)?durMin:PLAN_DEFAULT_DUR;
-  var end=PLAN_H1*60;
+  var fallback=null;
   var d=new Date(); d.setHours(0,0,0,0);
   for(var i=0;i<180;i++){
     var day=new Date(d); day.setDate(d.getDate()+i);
@@ -3223,11 +3312,11 @@ function findNextSlot(durMin, userIds){
     var key=rmDateKey(day);
     var start=dayFreeFrom(key,userIds);
     if(start==null) continue;
-    start=skipLunch(start,dur);
-    if(start+dur<=end) return {date:key, time:rmMinToTime(start)};
-    if(start<end) return {date:key, time:rmMinToTime(start)};
+    start=alignStart(start);
+    if(!fallback) fallback={date:key, time:rmMinToTime(start)};
+    if(planEnd(start,dur)<=PLAN_WORK_END) return {date:key, time:rmMinToTime(start)};
   }
-  return null;
+  return fallback;
 }
 function suggestSlot(force){
   var dEl=document.getElementById('mt-dstart'), tEl=document.getElementById('mt-time');
@@ -5163,7 +5252,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.73';
+const APP_VERSION = '5.75';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
