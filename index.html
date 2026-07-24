@@ -1047,6 +1047,11 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .pl-ti-n{font-size:12px;font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;}
 .pl-ti-m{font-size:10px;color:var(--tx3);white-space:nowrap;flex-shrink:0;}
 .pl-part{float:right;font-size:8px;opacity:.85;margin-left:3px;}
+.mt-elapsed{font-family:'D-DIN',monospace;font-size:11px;color:var(--tx3);flex-shrink:0;min-width:52px;text-align:right;}
+.mt-row.mt-running{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand);}
+.mt-row .tlc-btn{flex-shrink:0;}
+.pl-daystart{font-size:11px;color:var(--tx3);display:flex;align-items:center;gap:5px;}
+.pl-daystart input{background:var(--sf2);border:1px solid var(--bd);border-radius:6px;color:var(--tx);padding:3px 6px;font-family:'D-DIN',monospace;font-size:12px;}
 </style>
 </head>
 <body>
@@ -1818,7 +1823,7 @@ function save(){
     templates:S.templates,
     notifications:S.notifications,
     tsec:S.tsec,surl:S.surl,theme:S.theme,
-    sidebarOpen:S.sidebarOpen,history:S.history,clients:S.clients||[],notes:S.notes||[],dayStart:S.dayStart||'08:00',
+    sidebarOpen:S.sidebarOpen,history:S.history,clients:S.clients||[],notes:S.notes||[],dayStart:S.dayStart||'09:00',
   }));
   if(S.surl){
     _savePending = true; // Bloque checkTimestamp pendant l'export
@@ -1860,7 +1865,7 @@ function load(){
       history:Array.isArray(d.history)?d.history:[],
       clients:Array.isArray(d.clients)?d.clients:[],
       notes:Array.isArray(d.notes)?d.notes:[],
-      dayStart:typeof d.dayStart==='string'?d.dayStart:'08:00',
+      dayStart:typeof d.dayStart==='string'?d.dayStart:'09:00',
     });
     S.curFolder=null;
     S.tasks.forEach(t=>t.timerRunning=false);
@@ -1975,7 +1980,7 @@ function startTimer(id){
     const cur=S.tasks.find(x=>x.id===id);
     if(!cur||!cur.timerRunning||!cur.timerStart){clearInterval(_h);if(ivs[id]===_h)delete ivs[id];return;}
     const ex=Math.floor((Date.now()-cur.timerStart)/1000),tot=(cur.elapsed||0)+ex;
-    ['td-'+id,'gtd-'+id].forEach(eid=>{const e=document.getElementById(eid);if(e){e.textContent=fmt(tot);e.style.color='var(--brand)';}});
+    ['td-'+id,'gtd-'+id,'mtd-'+id].forEach(eid=>{const e=document.getElementById(eid);if(e){e.textContent=fmt(tot);e.style.color='var(--brand)';}});
     ['vs-'+id,'gvs-'+id].forEach(eid=>vsEl(eid,tot,cur.estimate));
     updTodayTime();
   },1000);
@@ -2191,6 +2196,7 @@ async function silentImport(){if(PRIVATE_MODE)return;
       };
     });
     if(d.tsec!==undefined) S.tsec=d.tsec;
+    if(typeof d.dayStart==='string'&&d.dayStart) S.dayStart=d.dayStart;
     mergeUsersFromSheet(d.users); if(Array.isArray(d.clients)) mergeClientsFromSheet(d.clients); if(Array.isArray(d.notes)) mergeNotesFromSheet(d.notes);
     // Sauvegarde locale sans re-déclencher l'export
     localStorage.setItem('gh_erp',JSON.stringify({
@@ -2198,7 +2204,7 @@ async function silentImport(){if(PRIVATE_MODE)return;
       templates:S.templates,
       notifications:S.notifications,
       tsec:S.tsec,surl:S.surl,theme:S.theme,
-      sidebarOpen:S.sidebarOpen,history:S.history,clients:S.clients||[],notes:S.notes||[],dayStart:S.dayStart||'08:00',
+      sidebarOpen:S.sidebarOpen,history:S.history,clients:S.clients||[],notes:S.notes||[],dayStart:S.dayStart||'09:00',
     }));
     renderAll();
     console.log('[Sync] OK:',d.projects.length,'projets,',d.tasks.filter(t=>!t.deleted&&!t.archived&&!t.done).length,'actives');
@@ -2509,6 +2515,7 @@ function renderKanbanCols(cols){
   return cols.map(st=>{
     let tasks=S.tasks.filter(t=>t.status===st.id&&!t.done&&!t.archived&&!t.deleted);
     tasks=tasks.filter(t=>t.assignees&&t.assignees.includes(CU.id));
+    tasks=sortTasksByPlan(tasks);
     const cards=tasks.map(t=>kanbanCard(t)).join('');
     const empty=tasks.length?'':'<div class="kb-empty">Vide</div>';
     return '<div class="kb-col" id="kbc-'+st.id+'" ondragover="kanbanDragOver(event,&quot;'+st.id+'&quot;)" ondrop="kanbanDrop(event,&quot;'+st.id+'&quot;)" ondragleave="kanbanDragLeave(event)">'+
@@ -2523,18 +2530,16 @@ function renderKanbanCols(cols){
 function renderSwimLane(cols){
   const users=S.users.filter(u=>u.role!=='disabled');
   let html='<div class="swim" style="--ncols:'+cols.length+'">';
-  // En-t\u00eate
-  html+='<div class="swimHead"><div class="swim-cell swim-user-hd">\ud83d\udc65</div>';
+  html+='<div class="swimHead"><div class="swim-cell swim-user-hd">👥</div>';
   cols.forEach(st=>{
     html+='<div class="swim-cell"><span class="kb-col-dot" style="background:'+st.color+'"></span>'+esc(st.label)+'</div>';
   });
   html+='</div>';
-  // Lignes par utilisateur
   users.forEach(u=>{
     html+='<div class="swimRow">';
     html+='<div class="swim-userCell" title="'+esc(u.name)+'"><span class="kc-av" style="background:'+u.color+'">'+u.initials+'</span></div>';
     cols.forEach(st=>{
-      const cellTasks=S.tasks.filter(t=>t.status===st.id&&!t.done&&!t.archived&&!t.deleted&&t.assignees&&t.assignees.includes(u.id));
+      const cellTasks=sortTasksByPlan(S.tasks.filter(t=>t.status===st.id&&!t.done&&!t.archived&&!t.deleted&&t.assignees&&t.assignees.includes(u.id)));
       const cards=cellTasks.map(t=>kanbanCard(t)).join('');
       html+='<div class="swim-statCell" data-status="'+st.id+'" data-user="'+u.id+'" ondragover="swimDragOver(event,&quot;'+st.id+'&quot;)" ondrop="swimDrop(event,&quot;'+st.id+'&quot;,&quot;'+u.id+'&quot;)" ondragleave="swimDragLeave(event)">'+cards+'</div>';
     });
@@ -2943,7 +2948,10 @@ function renderAllTasks(){
   const el=document.getElementById('globalList');
   if(!tasks.length){el.innerHTML='<div class="empty"><div class="ei">📋</div><h3>Aucune tâche</h3></div>';return;}
   const bp={};tasks.forEach(t=>{const k=t.project||'__';(bp[k]=bp[k]||[]).push(t);});
-  el.innerHTML=Object.keys(bp).map(pid=>{
+  const _pkey=function(pid){var m=9e15; bp[pid].forEach(function(t){ if(!t.done){ var k=taskSortKey(t); if(k<m)m=k; } }); return m;};
+  const _pnm=function(pid){var p=S.projects.find(function(x){return x.id===pid;}); return (p&&p.name)||'\uffff';};
+  const _pids=Object.keys(bp).sort(function(a,b){var ka=_pkey(a),kb=_pkey(b); if(ka!==kb)return ka-kb; return _pnm(a).localeCompare(_pnm(b));});
+  el.innerHTML=_pids.map(pid=>{
     const p=S.projects.find(x=>x.id===pid);
     const projName=p?esc(p.name):'Sans projet';
     // Ordre manuel (drag & drop) : actives en premier puis terminées, ordre du tableau respecté
@@ -3016,7 +3024,7 @@ function rmDayDrop(e,key){
   drag._upd=Date.now();
   save(); if(!PRIVATE_MODE&&typeof syncNow==='function')syncNow(); rmDragEnd(e); renderMyTasks();
 }
-function rmSetDayStart(v){ S.dayStart=v||'08:00'; save(); renderMyTasks(); }
+function rmSetDayStart(v){ S.dayStart=v||'09:00'; save(); renderMyTasks(); }
 function rmWeekNav(dir){ if(dir===0)_rmWeekOffset=0; else _rmWeekOffset+=dir; renderMyTasks(); }
 function rmSetTaskTime(e,id,v){ if(e)e.stopPropagation(); var t=S.tasks.find(function(x){return x.id===id;}); if(t){ t.planTime=v||''; t._upd=Date.now(); save(); if(!PRIVATE_MODE&&typeof syncNow==='function')syncNow(); renderMyTasks(); } }
 function mtTaskRow(t){
@@ -3030,9 +3038,19 @@ function mtTaskRow(t){
     var timeStr=(t._startMin!=null)?rmMinToTime(t._startMin):'';
     whenHtml='<div class="mt-when"><div class="mt-date">'+dateStr+'</div>'+(timeStr?'<div class="mt-time'+(t.planTime?' mt-manual':'')+'">'+timeStr+'</div>':'')+'</div>';
   }
-  return '<div class="mt-row" onclick="openEditTask(\''+t.id+'\')">'+
+  var canTimer=!CU||(t.assignees&&t.assignees.indexOf(CU.id)>=0)||CU.role==='admin'||CU.role==='manager';
+  var btns='';
+  if(canTimer&&!t.done&&!PRIVATE_MODE){
+    btns=t.timerRunning
+      ?'<button class="tlc-btn stop" onclick="event.stopPropagation();stopTimer(\''+t.id+'\')" title="Arrêter le chrono">⏹</button>'
+      :'<button class="tlc-btn play" onclick="event.stopPropagation();startTimer(\''+t.id+'\')" title="Démarrer le chrono">▶</button>';
+    btns+='<button class="tlc-btn" onclick="event.stopPropagation();editTaskTime(\''+t.id+'\')" title="Saisir le temps">✏</button>';
+  }
+  return '<div class="mt-row'+(t.timerRunning?' mt-running':'')+'" onclick="openEditTask(\''+t.id+'\')">'+
     whenHtml+
     '<div class="mt-rbody"><div class="mt-rname">'+prio+esc(t.name)+'</div><div class="mt-rmeta">'+(proj?esc(proj.name):'')+(t.estimate?(proj?' · ':'')+rmFmtDur(t.estimate):'')+'</div></div>'+
+    '<span class="mt-elapsed" id="mtd-'+t.id+'">'+fmt(t.elapsed||0)+'</span>'+
+    btns+
   '</div>';
 }
 var _planUsers=null, _planWeekOffset=0, _planDragId=null;
@@ -3053,6 +3071,14 @@ function planAssignLanes(blocks){
   b_maxlane=lanes.length;
 }
 var b_maxlane=1;
+function planSetDayStart(v){
+  if(!v) return;
+  S.dayStart=v;
+  replanAllDays();
+  save(); if(!PRIVATE_MODE&&typeof syncNow==='function') syncNow();
+  if(typeof toast==='function') toast('Journée à partir de '+v,'s');
+  renderPlanning();
+}
 function renderPlanControls(){
   var el=document.getElementById('planControls'); if(!el)return;
   var users=planActiveUsers();
@@ -3069,7 +3095,7 @@ function renderPlanControls(){
     navHtml='<button class="btn sm" onclick="planWeekNav(-1)">◀</button><span class="rm-weeklabel">'+wl+'</span><button class="btn sm" onclick="planWeekNav(1)">▶</button>'+(_planWeekOffset!==0?'<button class="btn sm" onclick="planWeekNav(0)">Auj.</button>':'');
   }
   el.innerHTML='<div class="pl-navrow">'+viewToggle+'<div class="pl-nav">'+navHtml+'</div></div>'+
-    '<div class="pl-people"><span style="font-size:11px;color:var(--tx3);align-self:center;">Voir :</span><button class="pl-chip'+(meOnly?' on':'')+'" onclick="planSelectMe()">Moi</button><button class="pl-chip'+(allOn?' on':'')+'" onclick="planSelectAll()">Tout le monde</button>'+chips+'</div>';
+    '<div class="pl-people"><span class="pl-daystart">Journée dès <input type="time" step="3600" value="'+(S.dayStart||'09:00')+'" onchange="planSetDayStart(this.value)" title="Heure de début de journée (synchronisée sur tous vos appareils)"/></span><span style="font-size:11px;color:var(--tx3);align-self:center;">Voir :</span><button class="pl-chip'+(meOnly?' on':'')+'" onclick="planSelectMe()">Moi</button><button class="pl-chip'+(allOn?' on':'')+'" onclick="planSelectAll()">Tout le monde</button>'+chips+'</div>';
 }
 var _planView='week', _planMonthOffset=0;
 function renderPlanTray(){
@@ -3428,7 +3454,7 @@ function scheduleTaskAt(taskId, dayKey, minutes){
     save(); if(!PRIVATE_MODE&&typeof syncNow==='function') syncNow();
     return;
   }
-  var m=Math.round(minutes/15)*15;
+  var m=Math.round(minutes/60)*60;
   var minOk=t.forced?PLAN_H0*60:dayStartMin();
   if(m<minOk)m=minOk;
   m=alignStart(m);
@@ -5297,6 +5323,7 @@ async function expSheets(url, silent=false){if(PRIVATE_MODE)return;
       notes:S.notes||[],
       users:S.users.map(u=>{const uu={...u};delete uu.pin;return uu;}),
       tsec:S.tsec,
+      dayStart:S.dayStart||'09:00',
       ts:ts
     });
     // POST no-cors : Apps Script reçoit les données
@@ -5403,7 +5430,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.79';
+const APP_VERSION = '5.80';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
