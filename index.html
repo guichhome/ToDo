@@ -1052,6 +1052,48 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
 .mt-row .tlc-btn{flex-shrink:0;}
 .pl-daystart{font-size:11px;color:var(--tx3);display:flex;align-items:center;gap:5px;}
 .pl-daystart input{background:var(--sf2);border:1px solid var(--bd);border-radius:6px;color:var(--tx);padding:3px 6px;font-family:'D-DIN',monospace;font-size:12px;}
+
+/* ── GANTT ── */
+.det-tabs{display:flex;gap:6px;margin-bottom:10px;}
+.det-tab{font-size:12px;padding:6px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--sf2);color:var(--tx);cursor:pointer;font-weight:600;transition:var(--tr);}
+.det-tab.on{background:var(--brand);border-color:var(--brand);color:#fff;}
+.g-ctrl{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;}
+.g-sum{font-size:12px;color:var(--tx3);margin-bottom:8px;}
+.g-jalon{display:inline-block;margin-left:10px;font-size:11px;color:var(--brand);font-weight:600;}
+.g-wrap{border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;background:var(--sf);}
+.g-scroll{overflow-x:auto;}
+.g-inner{min-width:100%;}
+.g-head{display:flex;position:sticky;top:0;z-index:6;background:var(--sf2);border-bottom:1px solid var(--bd);}
+.g-hlab{font-size:11px;font-weight:700;color:var(--tx3);display:flex;align-items:flex-end;padding-bottom:4px;}
+.g-morow{display:flex;height:20px;border-bottom:1px solid var(--bd);}
+.g-mo{font-size:10px;font-weight:700;color:var(--tx3);padding-left:5px;border-right:1px solid var(--bd);white-space:nowrap;overflow:hidden;text-transform:capitalize;box-sizing:border-box;}
+.g-urow{display:flex;height:26px;}
+.g-u{font-size:9px;color:var(--tx3);text-align:center;box-sizing:border-box;border-right:1px solid var(--bd);padding-top:2px;line-height:1.1;flex-shrink:0;}
+.g-u span{display:block;font-size:8px;opacity:.6;}
+.g-u.g-we{background:var(--sf);opacity:.55;}
+.g-u.g-td{background:var(--brand);color:#fff;font-weight:700;border-radius:4px 4px 0 0;}
+.g-u.g-td span{opacity:.9;}
+.g-body{position:relative;}
+.g-row{display:flex;border-bottom:1px solid var(--bd);min-height:30px;position:relative;z-index:2;}
+.g-row:last-child{border-bottom:none;}
+.g-lab{width:186px;flex-shrink:0;padding:5px 8px;box-sizing:border-box;border-right:1px solid var(--bd);cursor:pointer;overflow:hidden;background:var(--sf);}
+.g-lab:hover .g-lt{color:var(--brand);}
+.g-labdone .g-lt{text-decoration:line-through;opacity:.6;}
+.g-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:middle;}
+.g-lt{font-size:12px;font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:150px;vertical-align:middle;}
+.g-ls{display:block;font-size:10px;color:var(--tx4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:12px;}
+.g-track{position:relative;flex-shrink:0;}
+.g-bar{position:absolute;top:5px;height:19px;border-radius:5px;cursor:pointer;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.2);display:flex;align-items:center;transition:var(--tr);}
+.g-bar:hover{filter:brightness(1.12);}
+.g-bar.g-done{opacity:.55;}
+.g-fill{position:absolute;left:0;top:0;bottom:0;background:rgba(255,255,255,.28);}
+.g-blab{position:relative;font-size:9px;color:#fff;font-weight:700;padding:0 5px;white-space:nowrap;overflow:hidden;}
+.g-out{position:absolute;top:8px;font-size:11px;color:var(--tx4);}
+.g-nodate{position:absolute;left:4px;top:7px;font-size:10px;color:var(--tx4);font-style:italic;}
+.g-bgwe{position:absolute;top:0;bottom:0;background:var(--sf2);opacity:.5;z-index:1;}
+.g-bgline{position:absolute;top:0;bottom:0;width:1px;background:var(--bd);opacity:.5;z-index:1;}
+.g-today{position:absolute;top:0;bottom:0;width:2px;background:var(--brand);z-index:3;opacity:.75;}
+@media(max-width:700px){.g-lab{width:130px;}.g-lt{max-width:100px;font-size:11px;}}
 </style>
 </head>
 <body>
@@ -1108,6 +1150,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     <div class="bc" id="bc"><span class="cur">Dashboard</span></div><span id="privBadge" style="display:none;margin-left:10px;font-size:11px;font-family:'D-DIN',monospace;background:#16a085;color:#fff;padding:3px 9px;border-radius:20px;font-weight:600;white-space:nowrap;">🔒<span class="pb-txt"> Espace privé</span></span>
   </div>
   <div class="h-right">
+    <button class="hbtn" onclick="goBack()" title="Retour" id="backBtn">←</button>
     <button class="hbtn" onclick="goHome()" title="Accueil" id="homeBtn">🏠</button>
     <button class="hbtn" onclick="toggleTheme()" id="themeBtn">🌙</button>
     <button class="hbtn" onclick="toggleNotifs()" id="notifBtn" title="Notifications"><span>🔔</span><div class="notif-dot" id="notifDot" style="display:none;"></div></button>
@@ -1115,7 +1158,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
       <div class="user-avatar" id="headerAvatar" style="background:#D4873A;">?</div>
       <span class="user-name" id="headerName">—</span>
     </div>
-    <button class="hbtn" onclick="logout()" title="Changer d'utilisateur / Déconnexion" style="display:flex;align-items:center;justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+    
     <button class="btn pri sm" onclick="openNewTask()">+ Tâche</button>
   </div>
 </header>
@@ -1127,6 +1170,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
     <div class="ni act" onclick="goPage('dashboard')" id="nav-dashboard"><span class="ico">📊</span><span class="lbl">Dashboard</span></div>
     <div class="ni" onclick="goPage('kanban')" id="nav-kanban"><span class="ico">🗂</span><span class="lbl">Kanban</span><span class="nbg" id="nb-kanban">0</span></div>
     <div class="ni" onclick="goPage('projects')" id="nav-projects"><span class="ico">🏗</span><span class="lbl">Projets</span><span class="nbg" id="nb-projects">0</span></div>
+    <div class="ni" onclick="goPage('gantt')" id="nav-gantt"><span class="ico">📊</span><span class="lbl">Gantt</span></div>
     <div class="ni" onclick="goPage('all')" id="nav-all"><span class="ico">📋</span><span class="lbl">Toutes les tâches</span><span class="nbg" id="nb-all">0</span></div>
     <div class="ni" onclick="goPage('my-tasks')" id="nav-my-tasks"><span class="ico">👤</span><span class="lbl">Mes tâches</span><span class="nbg" id="nb-my">0</span></div>
     <div class="ni urgent-nav" onclick="goPage('urgent')" id="nav-urgent"><span class="ico">🔴</span><span class="lbl">Urgentes</span><span class="nbg" id="nb-urgent">0</span></div>
@@ -1153,7 +1197,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   </div>
   <!-- Déconnexion : toujours visible -->
   <div class="sb-section" id="logoutSection">
-    <div class="ni" onclick="logout()" id="nav-logout"><span class="ico">🚪</span><span class="lbl">Déconnexion</span></div>
+    
   </div>
 </aside>
 <div class="sb-backdrop" id="sbBackdrop" onclick="closeSidebar()"></div>
@@ -1216,7 +1260,7 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
       <button class="tfb" onclick="setDF('normal',this)">🟢 Normales</button>
       <button class="tfb" onclick="setDF('running',this)">⏱ En cours</button>
     </div>
-    <div class="tl" id="det-tasks"></div>
+    <div class="det-tabs"><button class="det-tab on" id="det-tab-list" onclick="showDetTab('list')">☰ Liste</button><button class="det-tab" id="det-tab-gantt" onclick="showDetTab('gantt')">📊 Gantt</button></div><div id="det-list"><div class="tl" id="det-tasks"></div></div><div id="det-gantt" style="display:none;"></div>
     <div class="atog" id="det-atog" onclick="toggleDetArch()"><span class="aarr">▶</span><span id="det-albl">Archivées (0)</span></div>
     <div id="det-arch" style="display:none;flex-direction:column;gap:5px;margin-top:7px;"></div>
   </div>
@@ -1287,6 +1331,11 @@ main::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
   </div>
 
   <!-- ── PLANNING ── -->
+  <div class="page" id="pg-gantt">
+    <div class="pgh"><div><div class="pgt">📊 Gantt</div><div class="pgs" id="gantt-sub">Vue d'ensemble des chantiers</div></div></div>
+    <div id="ganttBody"></div>
+  </div>
+
   <div class="page" id="pg-planning">
     <div class="pgh"><div><div class="pgt">Planning</div><div class="pgs">Vue d'ensemble de la semaine</div></div><div class="pga"><button class="btn pri sm" onclick="openNewTask()">+ Tâche</button></div></div>
     <div id="planControls" class="pl-controls"></div>
@@ -2007,6 +2056,23 @@ function updTodayTime(){
 }
 
 // ── LOGIN ──
+async function preloadUsersForLogin(){
+  if(PRIVATE_MODE) return;
+  if(!S.surl) return;
+  try{
+    const r = await fetch(S.surl+'?action=load',{cache:'no-store'});
+    if(!r.ok) return;
+    const d = await r.json();
+    if(!d || !d.success || !Array.isArray(d.users) || !d.users.length) return;
+    mergeUsersFromSheet(d.users);
+    try{
+      const raw=JSON.parse(localStorage.getItem('gh_erp')||'{}');
+      raw.users=S.users;
+      localStorage.setItem('gh_erp',JSON.stringify(raw));
+    }catch(_){}
+    if(!CU && typeof renderLogin==='function') renderLogin();
+  }catch(e){ console.log('[Login] Noms locaux conserves (hors ligne)'); }
+}
 function renderLogin(){
   const grid=document.getElementById('userGrid');
   console.log('[Login] S.users:', S.users.length, 'grid:', !!grid);
@@ -2320,7 +2386,7 @@ function goPage(p){
   const navEl=document.getElementById('nav-'+p)||document.getElementById('nav-'+p.split('-')[0]+'-'+p.split('-')[1]);
   if(navEl)navEl.classList.add('act');
   // Breadcrumb
-  const labels={dashboard:'Dashboard',kanban:'Kanban',projects:'Projets',all:'Toutes les tâches','my-tasks':'Mes tâches',urgent:'Urgentes',done:'Tâches terminées',stats:'Statistiques',archive:'Archives',admin:'Administration',clients:'Clients',notes:'Notes',planning:'Planning',
+  const labels={dashboard:'Dashboard',kanban:'Kanban',projects:'Projets',all:'Toutes les tâches','my-tasks':'Mes tâches',urgent:'Urgentes',done:'Tâches terminées',stats:'Statistiques',archive:'Archives',admin:'Administration',clients:'Clients',notes:'Notes',planning:'Planning',gantt:'Gantt',
     'pole-arch':'Architecture','pole-compta':'Comptabilité','pole-marketing':'Marketing','pole-gestion':'Gestion','pole-atelier':'Atelier','pole-commercial':'Commercial'};
   document.getElementById('bc').innerHTML=`<span class="cur">${labels[p]||p}</span>`;
   // Sur mobile, refermer le tiroir après navigation
@@ -2341,6 +2407,7 @@ function renderPage(p){
   else if(p==='clients')renderClients();
   else if(p==='notes')renderNotes();
   else if(p==='planning')renderPlanning();
+  else if(p==='gantt')renderGlobalGantt();
   else if(p==='admin')renderAdmin();
   else if(p.startsWith('pole-'))renderPole(S.curPole);
 }
@@ -2909,6 +2976,7 @@ function getAllProjectsInFolder(folderId){
 function openProject(id){S.curProjId=id;goPage('detail');}
 function renderDetail(){
   const p=S.projects.find(x=>x.id===S.curProjId);if(!p)return;
+  setTimeout(function(){ if(S.detTab==='gantt') showDetTab('gantt'); },0);
   document.getElementById('det-t').textContent=p.name;
   document.getElementById('det-s').textContent=(p.client||'')+(p.dateEnd?' · Fin prévue: '+p.dateEnd:'');
   document.getElementById('bc').innerHTML=`<span onclick="goPage('projects')" style="cursor:pointer;color:var(--tx3)">Projets</span><span class="sep">›</span><span class="cur">${p.name}</span>`;
@@ -3520,6 +3588,204 @@ function suggestSlot(force){
   }
 }
 function markSlotTouched(){ var d=document.getElementById('mt-dstart'); if(d&&d.dataset) d.dataset.touched='1'; var p=document.getElementById('mt-pin'); if(p)p.checked=true; var h=document.getElementById('mt-slot-hint'); if(h)h.style.display='none'; }
+
+var _gScale='day', _gOffset=0, _gView='project';
+function gPxDay(){ return _gScale==='day'?34:11; }
+function gWinLen(){ return _gScale==='day'?28:126; }
+function gKeyToDate(k){ return new Date(k+'T00:00'); }
+function gAddDays(d,n){ var x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function gDiff(a,b){ return Math.round((gKeyToDate(b)-gKeyToDate(a))/86400000); }
+function gMonday(d){ var x=new Date(d); x.setHours(0,0,0,0); var w=(x.getDay()+6)%7; x.setDate(x.getDate()-w); return x; }
+function taskRange(t){
+  if(!t.dateStart) return null;
+  var st=rmTimeToMin(t.planTime); if(st==null)st=dayStartMin();
+  var segs=taskSpan(t.dateStart, st, taskDur(t), t.forced);
+  var last=(segs&&segs.length)?segs[segs.length-1].day:t.dateStart;
+  return {start:t.dateStart, end:last};
+}
+function projRange(pid){
+  var ts=S.tasks.filter(function(t){return t.project===pid&&!t.archived&&!t.deleted;});
+  var mn=null,mx=null;
+  ts.forEach(function(t){
+    var r=taskRange(t); if(!r) return;
+    if(!mn||r.start<mn) mn=r.start;
+    if(!mx||r.end>mx) mx=r.end;
+  });
+  var p=S.projects.find(function(x){return x.id===pid;});
+  if(p){
+    if(p.dateStart && (!mn||p.dateStart<mn)) mn=p.dateStart;
+    if(p.dateEnd && (!mx||p.dateEnd>mx)) mx=p.dateEnd;
+  }
+  return (mn&&mx)?{start:mn,end:mx}:null;
+}
+function gWinStart(rows){
+  var mn=null;
+  rows.forEach(function(r){ if(r.start && (!mn||r.start<mn)) mn=r.start; });
+  var base=mn?gKeyToDate(mn):new Date();
+  var today=new Date(); today.setHours(0,0,0,0);
+  if(base>today) base=today;
+  var st=gMonday(base);
+  return gAddDays(st, _gOffset*(_gScale==='day'?7:28));
+}
+function ganttChartHtml(rows, opts){
+  opts=opts||{};
+  var px=gPxDay(), len=gWinLen();
+  var win=gWinStart(rows);
+  var winKey=rmDateKey(win);
+  var endKey=rmDateKey(gAddDays(win,len-1));
+  var todayKey=rmDateKey(new Date());
+  var W=len*px;
+  var MOIS=['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+  var JJ=['L','M','M','J','V','S','D'];
+  // en-tete mois
+  var mois='', i=0;
+  while(i<len){
+    var d=gAddDays(win,i), m=d.getMonth(), n=0;
+    while(i+n<len && gAddDays(win,i+n).getMonth()===m) n++;
+    mois+='<div class="g-mo" style="width:'+(n*px)+'px;">'+MOIS[m]+' '+String(d.getFullYear()).slice(2)+'</div>';
+    i+=n;
+  }
+  // en-tete unites
+  var units='';
+  if(_gScale==='day'){
+    for(var k=0;k<len;k++){
+      var d2=gAddDays(win,k), wk=(d2.getDay()===0||d2.getDay()===6);
+      var isT=rmDateKey(d2)===todayKey;
+      units+='<div class="g-u'+(wk?' g-we':'')+(isT?' g-td':'')+'" style="width:'+px+'px;">'+d2.getDate()+'<span>'+JJ[(d2.getDay()+6)%7]+'</span></div>';
+    }
+  } else {
+    for(var k2=0;k2<len;k2+=7){
+      var d3=gAddDays(win,k2);
+      units+='<div class="g-u" style="width:'+(7*px)+'px;">'+d3.getDate()+'/'+(d3.getMonth()+1)+'</div>';
+    }
+  }
+  // fond
+  var bg='';
+  if(_gScale==='day'){
+    for(var b=0;b<len;b++){
+      var db=gAddDays(win,b), wkb=(db.getDay()===0||db.getDay()===6);
+      if(wkb) bg+='<div class="g-bgwe" style="left:'+(b*px)+'px;width:'+px+'px;"></div>';
+    }
+  } else {
+    for(var b2=0;b2<len;b2+=7) bg+='<div class="g-bgline" style="left:'+(b2*px)+'px;"></div>';
+  }
+  var tOff=gDiff(winKey,todayKey);
+  var todayLine=(tOff>=0&&tOff<len)?'<div class="g-today" style="left:'+(tOff*px+px/2)+'px;"></div>':'';
+  // lignes
+  var body=rows.map(function(r){
+    var bar='';
+    if(r.start&&r.end&&r.end>=winKey&&r.start<=endKey){
+      var s=Math.max(0,gDiff(winKey,r.start));
+      var e=Math.min(len-1,gDiff(winKey,r.end));
+      var w=Math.max(px*0.7,(e-s+1)*px-2);
+      var pct=(r.pct!=null)?r.pct:null;
+      bar='<div class="g-bar'+(r.done?' g-done':'')+'" style="left:'+(s*px+1)+'px;width:'+w+'px;background:'+(r.color||'var(--brand)')+';" '+
+        (r.click?'onclick="'+r.click+'"':'')+' title="'+esc(r.tip||r.label)+'">'+
+        (pct!=null?'<div class="g-fill" style="width:'+pct+'%;"></div>':'')+
+        '<span class="g-blab">'+esc(r.bar||'')+'</span></div>';
+    } else if(r.start&&r.end){
+      var av=r.end<winKey;
+      bar='<div class="g-out" style="'+(av?'left:2px;':'right:2px;')+'">'+(av?'◀':'▶')+'</div>';
+    } else {
+      bar='<div class="g-nodate">pas de date</div>';
+    }
+    return '<div class="g-row">'+
+      '<div class="g-lab'+(r.done?' g-labdone':'')+'" '+(r.click?'onclick="'+r.click+'"':'')+' title="'+esc(r.label)+'">'+
+        '<span class="g-dot" style="background:'+(r.color||'var(--brand)')+';"></span>'+
+        '<span class="g-lt">'+esc(r.label)+'</span>'+(r.sub?'<span class="g-ls">'+esc(r.sub)+'</span>':'')+
+      '</div>'+
+      '<div class="g-track" style="width:'+W+'px;">'+bar+'</div>'+
+    '</div>';
+  }).join('');
+  if(!rows.length) body='<div class="rm-empty" style="padding:18px;">Aucune tâche à afficher</div>';
+  return '<div class="g-wrap">'+
+    '<div class="g-scroll"><div class="g-inner" style="width:'+(W+186)+'px;">'+
+      '<div class="g-head"><div class="g-lab g-hlab">'+(opts.title||'Tâche')+'</div><div class="g-track" style="width:'+W+'px;">'+
+        '<div class="g-morow">'+mois+'</div><div class="g-urow">'+units+'</div></div></div>'+
+      '<div class="g-body">'+bg+todayLine+body+'</div>'+
+    '</div></div>'+
+  '</div>';
+}
+function ganttControls(cb){
+  return '<div class="g-ctrl">'+
+    '<div class="pl-viewtoggle"><button class="pl-vt'+(_gScale==='day'?' on':'')+'" onclick="gSetScale(\'day\')">Jour</button>'+
+    '<button class="pl-vt'+(_gScale==='week'?' on':'')+'" onclick="gSetScale(\'week\')">Semaine</button></div>'+
+    '<div class="pl-nav"><button class="btn sm" onclick="gNav(-1)">◀</button>'+
+    '<button class="btn sm" onclick="gNav(0)">Auj.</button>'+
+    '<button class="btn sm" onclick="gNav(1)">▶</button></div>'+
+  '</div>';
+}
+function gSetScale(s){ _gScale=s; _gOffset=0; gRefresh(); }
+function gNav(d){ if(d===0)_gOffset=0; else _gOffset+=d; gRefresh(); }
+function gRefresh(){ if(S.cur==='gantt') renderGlobalGantt(); else renderProjectGantt(); }
+function renderProjectGantt(){
+  var el=document.getElementById('det-gantt'); if(!el)return;
+  var pid=S.curProjId; if(!pid){ el.innerHTML=''; return; }
+  var tasks=S.tasks.filter(function(t){return t.project===pid&&!t.archived&&!t.deleted;});
+  tasks=sortTasksByPlan(tasks);
+  var rows=tasks.map(function(t){
+    var r=taskRange(t);
+    var u=S.users.find(function(x){return x.id===taskOwner(t);});
+    var who=u?u.initials:'—';
+    return {
+      label:(t.priority==='urgent'?'🔴 ':'')+t.name,
+      sub:who+' · '+rmFmtDur(taskDur(t)),
+      start:r?r.start:null, end:r?r.end:null,
+      color:u?u.color:'#94A3B8',
+      done:!!t.done, pct:t.done?100:null,
+      bar:t.planTime||'',
+      tip:t.name+(r?' · '+r.start+' → '+r.end:' · non planifiée'),
+      click:"openEditTask('"+t.id+"')"
+    };
+  });
+  var p=S.projects.find(function(x){return x.id===pid;});
+  var fin=(p&&p.dateEnd)?'<div class="g-jalon">🏁 Fin prévue : '+p.dateEnd.split('-').reverse().join('/')+'</div>':'';
+  var nb=tasks.length, fait=tasks.filter(function(t){return t.done;}).length;
+  var pct=nb?Math.round(fait/nb*100):0;
+  el.innerHTML=ganttControls()+
+    '<div class="g-sum">'+fait+'/'+nb+' tâches terminées · <b>'+pct+'%</b>'+fin+'</div>'+
+    ganttChartHtml(rows,{title:'Tâche'});
+}
+function renderGlobalGantt(){
+  var el=document.getElementById('ganttBody'); if(!el)return;
+  var projs=S.projects.filter(function(p){return !p.isFolder&&!p.archived&&!p.deleted;});
+  var rows=projs.map(function(p){
+    var r=projRange(p.id);
+    var ts=S.tasks.filter(function(t){return t.project===p.id&&!t.archived&&!t.deleted;});
+    var fait=ts.filter(function(t){return t.done;}).length;
+    var pct=ts.length?Math.round(fait/ts.length*100):0;
+    var cli=p.clientId?((S.clients||[]).find(function(c){return c.id===p.clientId;})||{}).name:p.client;
+    return {
+      label:p.name, sub:(cli||'')+(ts.length?' · '+ts.length+' tâches':''),
+      start:r?r.start:null, end:r?r.end:null,
+      color:pct===100?'var(--ok)':'var(--brand)',
+      done:pct===100, pct:pct, bar:pct+'%',
+      tip:p.name+(cli?' — '+cli:'')+' · '+pct+'%',
+      click:"openProject('"+p.id+"')"
+    };
+  });
+  rows.sort(function(a,b){
+    if(a.done!==b.done) return a.done?1:-1;
+    if(!a.start) return 1; if(!b.start) return -1;
+    return a.start.localeCompare(b.start);
+  });
+  var sub=document.getElementById('gantt-sub');
+  if(sub) sub.textContent=rows.length+' chantier(s) — vue d\'ensemble';
+  el.innerHTML=ganttControls()+ganttChartHtml(rows,{title:'Chantier'});
+}
+function showDetTab(tab){
+  S.detTab=tab;
+  var l=document.getElementById('det-list'), g=document.getElementById('det-gantt');
+  var bl=document.getElementById('det-tab-list'), bg=document.getElementById('det-tab-gantt');
+  if(tab==='gantt'){
+    if(l)l.style.display='none'; if(g)g.style.display='block';
+    if(bl)bl.classList.remove('on'); if(bg)bg.classList.add('on');
+    renderProjectGantt();
+  } else {
+    if(l)l.style.display='block'; if(g)g.style.display='none';
+    if(bl)bl.classList.add('on'); if(bg)bg.classList.remove('on');
+  }
+}
 
 function renderMyTasks(){
   if(!CU)return;
@@ -5430,7 +5696,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelect
 
 // ── INIT ──
 // Nettoyer les anciennes sessions au démarrage (version bump)
-const APP_VERSION = '5.80';
+const APP_VERSION = '5.82';
 const savedVersion = localStorage.getItem('gh_version');
 if(savedVersion !== APP_VERSION){
   // Nouvelle version : vide tout le cache local pour repartir propre
@@ -5552,10 +5818,15 @@ function openWidget(id){
     setAppBrand('Tâches');
     showScreen('app');
     if(typeof applySidebarState==='function') applySidebarState();
-    var _notTask=['admin','stats','clients','notes','planning'];
-    var pg=(S.cur && _notTask.indexOf(S.cur)<0)?S.cur:'dashboard';
-    if(typeof goPage==='function') goPage(pg);
+    if(typeof goPage==='function') goPage('dashboard');
   }
+}
+function goBack(){
+  var widgetPages=['admin','stats','clients','notes','planning'];
+  if(PRIVATE_MODE){ if(S.cur&&S.cur!=='dashboard'){ goPage('dashboard'); } else { enterHome(); } return; }
+  if(S.cur && widgetPages.indexOf(S.cur)>=0){ enterHome(); return; }
+  if(S.cur && S.cur!=='dashboard'){ goPage('dashboard'); return; }
+  enterHome();
 }
 function goHome(){ renderHome(); showScreen('home'); }
 function runSplash(cb){
@@ -5587,6 +5858,7 @@ function routeAfterSplash(){
     }catch(e){ localStorage.removeItem('gh_session'); }
   } else { localStorage.removeItem('gh_session'); }
   renderLogin(); showScreen('login');
+  preloadUsersForLogin();
 }
 
 updateFavicon();
